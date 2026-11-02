@@ -1,65 +1,120 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import string
+import time
 import matplotlib.pyplot as plt
 import seaborn as sns
 from mlxtend.frequent_patterns import apriori, association_rules, fpgrowth
-import time
+
+# Pengaturan Tema Visual Grafik
+sns.set_theme(style="whitegrid")
 
 # Konfigurasi Halaman Streamlit
 st.set_page_config(
-    page_title="Dashboard Skripsi - Market Basket Analysis",
+    page_title="Dashboard PT. Cakrawala Kemasindo Lestari",
     page_icon="📊",
     layout="wide"
 )
 
 # ---------------------------------------------------------
-# CACHE DATA & PEMROSESAN UTAMA
+# CACHE DATA & PEMROSESAN KDD (DENGAN MAPPING ABJAD)
 # ---------------------------------------------------------
 @st.cache_data
 def load_and_process_data():
     file_path = "Penjualan2025.xlsx"
     df_raw = pd.read_excel(file_path, sheet_name="Rekap 2025", header=1)
-    df_selected = df_raw[['TANGGAL', 'CUSTOMER', 'ID TRANSAKSI', 'ITEM', 'QTY', 'TOTAL']].copy()
     
-    # Preprocessing
-    df_clean = df_selected.dropna(subset=['ID TRANSAKSI', 'ITEM']).drop_duplicates()
+    # Data Cleaning & Selection
+    df_clean = df_raw.dropna(subset=['ITEM', 'ID TRANSAKSI']).copy()
     df_clean['ID TRANSAKSI'] = df_clean['ID TRANSAKSI'].astype(str).str.strip()
     df_clean['ITEM'] = df_clean['ITEM'].astype(str).str.strip()
+    df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
     
-    # Transformation Matrix
-    basket = (df_clean.groupby(['ID TRANSAKSI', 'ITEM'])['ITEM']
+    # Ekstraksi Tanggal & Bulan untuk Filter dan Grafik
+    df_clean['TANGGAL'] = pd.to_datetime(df_clean['TANGGAL'], errors='coerce')
+    df_clean['BULAN'] = df_clean['TANGGAL'].dt.strftime('%B %Y')
+    df_clean['BULAN_NUM'] = df_clean['TANGGAL'].dt.to_period('M')
+    
+    # Data Transformation (Pengelompokan Ukuran Item ke Abjad A-Z, AA, dst.)
+    unique_items = sorted(df_clean['ITEM'].unique())
+    
+    def get_excel_style_label(n):
+        label = ''
+        while n >= 0:
+            label = string.ascii_uppercase[n % 26] + label
+            n = n // 26 - 1
+        return label
+
+    item_mapping = {item: get_excel_style_label(i) for i, item in enumerate(unique_items)}
+    reverse_mapping = {v: k for k, v in item_mapping.items()}
+    df_clean['ITEM_KODE'] = df_clean['ITEM'].map(item_mapping)
+    
+    # Basket Matrix (One-Hot Encoding berdasarkan Kode Abjad)
+    basket = (df_clean.groupby(['ID TRANSAKSI', 'ITEM_KODE'])['ITEM_KODE']
               .count().unstack().reset_index().fillna(0)
               .set_index('ID TRANSAKSI'))
-    basket_sets = basket.map(lambda x: 1 if x > 0 else 0).astype(bool)
+    basket_sets = basket.map(lambda x: True if x > 0 else False)
     
-    return df_clean, basket_sets
+    return df_clean, item_mapping, reverse_mapping, basket_sets
 
 try:
-    df_clean, basket_sets = load_and_process_data()
+    df_clean, item_mapping, reverse_mapping, basket_sets = load_and_process_data()
 except Exception as e:
-    st.error(f"Gagal memuat file dataset: {e}")
+    st.error(f"Gagal memuat file dataset `Penjualan2025.xlsx`: {e}")
+    st.info("Pastikan file `Penjualan2025.xlsx` berada di direktori folder yang sama dengan `app.py`.")
     st.stop()
 
 # ---------------------------------------------------------
-# SIDEBAR NAVIGASI
+# SIDEBAR: NAVIGASI & FILTER GLOBAL
 # ---------------------------------------------------------
 st.sidebar.title("📌 Navigasi Menu")
-menu = st.sidebar.radio("Pilih Menu Utama:", ["🏠 Home / Beranda", "📈 Hasil Analisis & Mining"])
+menu_pilihan = st.sidebar.radio(
+    "Pilih Halaman:", 
+    [
+        "🏠 Home / Beranda", 
+        "📈 Hasil Analisis Data Mining", 
+        "⚖️ Pengujian 5 Iterasi",
+        "📊 Grafik & Filter Penjualan",  # <--- Menu Baru Filter & Grafik
+        "⚙️ Parameter Model"
+    ]
+)
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Tips Skripsi:** Gunakan menu di atas untuk beralih antara profil penelitian dan hasil eksperimen algoritma.")
+st.sidebar.subheader("🔍 Filter Data Interaktif")
 
-# ---------------------------------------------------------
-# HALAMAN 1: HOME (RINGKASAN DATA & IDENTITAS)
-# ---------------------------------------------------------
-if menu == "🏠 Home / Beranda":
-    st.title("🎓 Dashboard Penelitian Skripsi")
-    st.subheader("Analisis Perbandingan Apriori dan FP-Growth untuk Penentuan Paket Penjualan")
+list_pelanggan = ['Semua Pelanggan'] + sorted(df_clean['CUSTOMER'].unique().tolist())
+list_bulan = ['Semua Bulan'] + sorted(df_clean['BULAN'].dropna().unique().tolist())
+list_ukuran = ['Semua Ukuran'] + sorted(df_clean['ITEM'].unique().tolist())
+
+pilih_pelanggan = st.sidebar.selectbox("Pilih Pelanggan:", list_pelanggan)
+pilih_bulan = st.sidebar.selectbox("Pilih Bulan Transaksi:", list_bulan)
+pilih_ukuran = st.sidebar.selectbox("Pilih Ukuran Item:", list_ukuran)
+
+st.sidebar.markdown("---")
+st.sidebar.info("💡 **Tips:** Gunakan menu di atas untuk berpindah halaman.")
+
+# Inisialisasi Session State Parameter Default
+if "min_supp" not in st.session_state:
+    st.session_state.min_supp = 0.005
+if "min_conf" not in st.session_state:
+    st.session_state.min_conf = 0.10
+if "algo_choice" not in st.session_state:
+    st.session_state.algo_choice = "FP-Growth"
+
+# =========================================================
+# MENU 1: HOME / BERANDA
+# =========================================================
+if menu_pilihan == "🏠 Home / Beranda":
+    st.title("📊 Dashboard PT. Cakrawala Kemasindo Lestari")
+    st.markdown("Analisis Pola Pembelian Produk (Ukuran Item Berbasis Abjad) Menggunakan Algoritma **Apriori** & **FP-Growth** (KDD Framework).")
+    st.markdown("---")
+    
+    st.subheader("🎓 Dashboard Penelitian Skripsi")
+    st.markdown("**Judul Skripsi:** Analisis Perbandingan Apriori dan FP-Growth untuk Penentuan Paket Penjualan (Studi Kasus: PT. Cakrawala Kemasindo Lestari)")
     
     st.markdown("---")
     
-    # Kolom Identitas Mahasiswa
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("### 👤 **Identitas Mahasiswa**")
@@ -67,100 +122,269 @@ if menu == "🏠 Home / Beranda":
         * **Nama Lengkap:** Dwitha Febriantie
         * **NIM:** 43230130
         * **Program Studi:** Sistem Informasi
-        * **Fakultas / Universitas:** STMIK IKMI Cirebon
+        * **Fakultas / Kampus:** STMIK IKMI Cirebon
         * **Semester:** 8 (Akhir)
         """)
     
     with col2:
-        st.markdown("### 📋 **Informasi Skripsi**")
+        st.markdown("### 📋 **Informasi Metodologi**")
         st.markdown("""
-        * **Judul Skripsi:** Analisis Perbandingan Apriori dan FP-Growth untuk Penentuan Paket Penjualan (Studi Kasus: PT. Cakrawala Kemasindo Lestari)
         * **Metodologi:** Knowledge Discovery in Databases (KDD)
         * **Dataset:** Rekapitulasi Penjualan Tahun 2025 (`Penjualan2025.xlsx`)
+        * **Preprocessing:** Pembersihan data kosong, 5 kali Pengujian Apriori dan FP-Growth serta Pengelompokan ukuran item fisik ke kode abjad ($A, B, \dots, Z, AA, \dots$).
         """)
         
     st.markdown("---")
     
-    # Ringkasan Metrik Dataset
-    st.subheader("📊 Ringkasan Dataset Penjualan")
-    # Baris Pertama
-    m1, m2 = st.columns(2)
-    m1.metric("Total Baris Transaksi Bersih", f"{len(df_clean):,} baris")
+    st.subheader("📊 Ringkasan Dataset PT. Cakrawala Kemasindo Lestari")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total Baris Bersih", f"{len(df_clean):,} Baris")
     m2.metric("Jumlah Transaksi Unik", f"{basket_sets.shape[0]:,} Transaksi")
+    m3.metric("Jumlah Ukuran Item Unik", f"{len(item_mapping):,} Ukuran")
 
+# =========================================================
+# MENU 2: HASIL ANALISIS DATA MINING
+# =========================================================
+elif menu_pilihan == "📈 Hasil Analisis Data Mining":
+    st.title("📈 Hasil Analisis Data Mining")
+    st.markdown("Eksperimen pembentukan aturan asosiasi dan rekomendasi paket penjualan (*bundling*).")
     st.markdown("---")
 
-    # Baris Kedua
-    m3, m4 = st.columns(2)
-    m3.metric("Jumlah Produk Unik (Item)", f"{basket_sets.shape[1]:,} Produk")
-    m4.metric("Aturan Asosiasi Terbentuk", "18 Aturan")
+    min_supp = st.session_state.min_supp
+    min_conf = st.session_state.min_conf
+    algo_choice = st.session_state.algo_choice
 
-# ---------------------------------------------------------
-# HALAMAN 2: HASIL ANALISIS & MINING
-# ---------------------------------------------------------
-elif menu == "📈 Hasil Analisis & Mining":
-    st.title("📈 Hasil Data Mining & Market Basket Analysis")
-    st.write("Eksperimen perbandingan algoritma **Apriori** dan **FP-Growth** berdasarkan dataset penjualan.")
-    
-    st.markdown("---")
-    
-    # Sidebar Filter Parameter
-    st.sidebar.subheader("⚙️ Parameter Mining")
-    min_sup = st.sidebar.slider("Minimum Support", 0.001, 0.050, 0.010, 0.001, format="%.3f")
-    min_conf = st.sidebar.slider("Minimum Confidence", 0.05, 0.90, 0.10, 0.05)
-    
-    # Eksekusi Algoritma
-    with st.spinner("Sedang menjalankan algoritma Apriori dan FP-Growth..."):
-        # Apriori
-        t0 = time.time()
-        freq_ap = apriori(basket_sets, min_support=min_sup, use_colnames=True)
-        rules_ap = association_rules(freq_ap, metric="confidence", min_threshold=min_conf)
-        t_ap = time.time() - t0
+    # Eksekusi Single Run Algoritma
+    with st.spinner("Sedang memproses algoritma..."):
+        t0 = time.perf_counter()
+        fi_ap = apriori(basket_sets, min_support=min_supp, use_colnames=True)
+        rules_ap = association_rules(fi_ap, metric="confidence", min_threshold=min_conf) if not fi_ap.empty else pd.DataFrame()
+        t_ap = time.perf_counter() - t0
         
-        # FP-Growth
-        t0 = time.time()
-        freq_fp = fpgrowth(basket_sets, min_support=min_sup, use_colnames=True)
-        rules_fp = association_rules(freq_fp, metric="confidence", min_threshold=min_conf)
-        t_fp = time.time() - t0
+        t0 = time.perf_counter()
+        fi_fp = fpgrowth(basket_sets, min_support=min_supp, use_colnames=True)
+        rules_fp = association_rules(fi_fp, metric="confidence", min_threshold=min_conf) if not fi_fp.empty else pd.DataFrame()
+        t_fp = time.perf_counter() - t0
 
-    # 1. Tabel Perbandingan Kinerja
-    st.subheader("⏱️ Tabel Perbandingan Performa Algoritma")
-    comp_df = pd.DataFrame({
-        'Algoritma': ['Apriori', 'FP-Growth'],
-        'Jumlah Frequent Itemsets': [len(freq_ap), len(freq_fp)],
-        'Jumlah Association Rules': [len(rules_ap), len(rules_fp)],
-        'Waktu Eksekusi (detik)': [round(t_ap, 4), round(t_fp, 4)]
-    })
-    st.dataframe(comp_df, use_container_width=True)
-    
-    # Grafik Waktu Eksekusi
-    fig, ax = plt.subplots(figsize=(8, 3))
-    sns.barplot(x='Algoritma', y='Waktu Eksekusi (detik)', data=comp_df, palette="viridis", ax=ax)
-    ax.set_title("Perbandingan Kecepatan Waktu Eksekusi")
-    st.pyplot(fig)
-    
-    st.markdown("---")
-    
-    # 2. Grafik Top 10 Produk Terlaris
-    st.subheader("🏆 Top 10 Produk Paling Sering Dibeli")
-    top_items = basket_sets.sum().sort_values(ascending=False).head(10)
-    
-    fig2, ax2 = plt.subplots(figsize=(10, 4))
-    sns.barplot(x=top_items.values, y=top_items.index, palette="Blues_r", ax=ax2)
-    ax2.set_xlabel("Frekuensi Transaksi")
-    ax2.set_ylabel("Nama Produk")
-    st.pyplot(fig2)
-    
-    st.markdown("---")
-    
-    # 3. Top Aturan Asosiasi (Association Rules)
-    st.subheader("📋 Top Aturan Asosiasi Terbaik (Lift Ratio > 1.0)")
-    if not rules_fp.empty:
-        strong_rules = rules_fp[rules_fp['lift'] > 1.0].sort_values(by='lift', ascending=False).copy()
-        strong_rules['Jika Membeli (Antecedent)'] = strong_rules['antecedents'].apply(lambda x: ', '.join(list(x)))
-        strong_rules['Maka Membeli (Consequent)'] = strong_rules['consequents'].apply(lambda x: ', '.join(list(x)))
+    rules = rules_ap if algo_choice == "Apriori" else rules_fp
+    fi_active = fi_ap if algo_choice == "Apriori" else fi_fp
+
+    if not rules.empty:
+        rules['antecedents_label'] = rules['antecedents'].apply(lambda x: ", ".join(list(x)))
+        rules['consequents_label'] = rules['consequents'].apply(lambda x: ", ".join(list(x)))
         
-        display_cols = ['Jika Membeli (Antecedent)', 'Maka Membeli (Consequent)', 'support', 'confidence', 'lift']
-        st.dataframe(strong_rules[display_cols].head(10), use_container_width=True)
+        rules['antecedents_full'] = rules['antecedents'].apply(lambda x: ", ".join([f"{code} ({reverse_mapping[code]})" for code in x]))
+        rules['consequents_full'] = rules['consequents'].apply(lambda x: ", ".join([f"{code} ({reverse_mapping[code]})" for code in x]))
+        rules = rules.sort_values(by='lift', ascending=False)
+
+    # Metrik Ringkasan Atas
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Transaksi", f"{basket_sets.shape[0]:,}")
+    c2.metric("Frequent Itemsets", f"{len(fi_active):,}")
+    c3.metric(f"Association Rules ({algo_choice})", f"{len(rules):,}")
+    c4.metric("Waktu Eksekusi Single Run", f"{t_ap if algo_choice=='Apriori' else t_fp:.4f} s")
+
+    st.markdown("---")
+
+    sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
+        "🚀 Top 10 Rules (Bundling)", 
+        "📈 Semua Aturan Asosiasi", 
+        "🔤 Kamus Kode Ukuran", 
+        "📋 Data Transaksi Berkode"
+    ])
+
+    with sub_tab1:
+        st.subheader("🔥 Top 10 Association Rules Terbaik (Berdasarkan Lift Ratio)")
+        st.markdown(f"Parameter Aktif: **Min Support = {min_supp}** | **Min Confidence = {min_conf}** | **Algoritma = {algo_choice}**")
+        
+        if not rules.empty:
+            top_10 = rules.head(10)[['antecedents_full', 'consequents_full', 'support', 'confidence', 'lift']].copy()
+            top_10.columns = ['Antecedents (Kode & Ukuran Asli)', 'Consequents (Kode & Ukuran Asli)', 'Support', 'Confidence', 'Lift Ratio']
+            st.dataframe(top_10, use_container_width=True)
+        else:
+            st.warning("Tidak ada aturan asosiasi yang ditemukan dengan parameter tersebut.")
+
+    with sub_tab2:
+        st.subheader(f"Seluruh Aturan Asosiasi ({len(rules)} Rules)")
+        if not rules.empty:
+            st.dataframe(rules[['antecedents_full', 'consequents_full', 'support', 'confidence', 'lift']], use_container_width=True)
+        else:
+            st.warning("Data aturan asosiasi kosong.")
+
+    with sub_tab3:
+        st.subheader("🔤 Kamus Referensi Pemetaan Ukuran Item ke Kode Abjad")
+        df_kamus = pd.DataFrame(list(item_mapping.items()), columns=['UKURAN_ITEM_ASLI', 'KODE_ABJAD'])
+        df_kamus = df_kamus.sort_values(by='KODE_ABJAD').reset_index(drop=True)
+        st.dataframe(df_kamus, use_container_width=True)
+
+    with sub_tab4:
+        st.subheader("📋 Pratinjau Data Transaksi Hasil Clean & Mapping Kode")
+        st.dataframe(df_clean[['TANGGAL', 'CUSTOMER', 'ID TRANSAKSI', 'ITEM', 'ITEM_KODE', 'QTY']].head(100), use_container_width=True)
+
+# =========================================================
+# MENU 3: PENGUJIAN 5 ITERASI & PERBANDINGAN KINERJA
+# =========================================================
+elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
+    st.title("⚖️ Hasil Pengujian 5 Iterasi Komparatif")
+    st.markdown("Berikut adalah tabel rincian hasil pengujian komparatif 5 iterasi yang disesuaikan dengan hasil eksperimen terbaru pada Google Colab.")
+    st.markdown("---")
+
+    min_supp = st.session_state.min_supp
+    min_conf = st.session_state.min_conf
+
+    df_iter = pd.DataFrame([
+        {'Pengujian': 1, 'Waktu Apriori (detik)': 0.111713, 'Waktu FP-Growth (detik)': 0.296784, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': 2, 'Waktu Apriori (detik)': 0.029206, 'Waktu FP-Growth (detik)': 0.165974, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': 3, 'Waktu Apriori (detik)': 0.020686, 'Waktu FP-Growth (detik)': 0.152908, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': 4, 'Waktu Apriori (detik)': 0.020072, 'Waktu FP-Growth (detik)': 0.153038, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': 5, 'Waktu Apriori (detik)': 0.019503, 'Waktu FP-Growth (detik)': 0.453314, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0}
+    ])
+
+    summary_df = pd.DataFrame([
+        {
+            'Pengujian': 'Rata-rata',
+            'Waktu Apriori (detik)': 0.040236,
+            'Waktu FP-Growth (detik)': 0.244403,
+            'Frequent Itemsets Apriori': 126.0,
+            'Frequent Itemsets FP-Growth': 126.0,
+            'Association Rules Apriori': 86.0,
+            'Association Rules FP-Growth': 86.0
+        },
+        {
+            'Pengujian': 'Standar Deviasi',
+            'Waktu Apriori (detik)': 0.040154,
+            'Waktu FP-Growth (detik)': 0.131584,
+            'Frequent Itemsets Apriori': float('nan'),
+            'Frequent Itemsets FP-Growth': float('nan'),
+            'Association Rules Apriori': float('nan'),
+            'Association Rules FP-Growth': float('nan')
+        }
+    ])
+
+    df_tabel_komparasi = pd.concat([df_iter, summary_df], ignore_index=True)
+
+    st.subheader("📊 Tabel Perbandingan Hasil Algoritma Apriori dan FP-Growth")
+    st.dataframe(df_tabel_komparasi.style.format({
+        'Waktu Apriori (detik)': '{:.6f}',
+        'Waktu FP-Growth (detik)': '{:.6f}',
+        'Frequent Itemsets Apriori': '{:.1f}',
+        'Frequent Itemsets FP-Growth': '{:.1f}',
+        'Association Rules Apriori': '{:.1f}',
+        'Association Rules FP-Growth': '{:.1f}'
+    }, na_rep="NaN"), use_container_width=True)
+
+    st.markdown("---")
+    st.markdown("### Ringkasan Jumlah Hasil Algoritma")
+    col_sum1, col_sum2 = st.columns(2)
+    with col_sum1:
+        st.markdown("**APRIORI**")
+        st.write(f"Jumlah Frequent Itemsets : {int(df_tabel_komparasi.loc[0, 'Frequent Itemsets Apriori'])}")
+        st.write(f"Jumlah Association Rules : {int(df_tabel_komparasi.loc[0, 'Association Rules Apriori'])}")
+    with col_sum2:
+        st.markdown("**FP-GROWTH**")
+        st.write(f"Jumlah Frequent Itemsets : {int(df_tabel_komparasi.loc[0, 'Frequent Itemsets FP-Growth'])}")
+        st.write(f"Jumlah Association Rules : {int(df_tabel_komparasi.loc[0, 'Association Rules FP-Growth'])}")
+
+    st.markdown("---")
+
+    col_g1, col_g2 = st.columns(2)
+    
+    with col_g1:
+        st.subheader("📊 Grouped Bar Chart per Iterasi")
+        fig, ax = plt.subplots(figsize=(6, 4))
+        x = np.arange(len(df_iter))
+        width = 0.35
+
+        bars1 = ax.bar(x - width/2, df_iter['Waktu Apriori (detik)'], width, label='Apriori', color='#1f77b4')
+        bars2 = ax.bar(x + width/2, df_iter['Waktu FP-Growth (detik)'], width, label='FP-Growth', color='#ff7f0e')
+
+        ax.set_ylabel('Waktu Eksekusi (Detik)', fontweight='bold')
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"Pengujian {i}" for i in df_iter['Pengujian']], rotation=15, fontsize=8)
+        ax.legend()
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+        for bar in bars1:
+            yval = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2, yval + 0.002, f"{yval:.4f}s", ha='center', va='bottom', fontsize=7, fontweight='bold')
+
+        for bar in bars2:
+            yval = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2, yval + 0.002, f"{yval:.4f}s", ha='center', va='bottom', fontsize=7, fontweight='bold')
+
+        st.pyplot(fig)
+
+    with col_g2:
+        st.subheader("📈 Scatter Plot Support vs Confidence")
+        fi_ap = apriori(basket_sets, min_support=min_supp, use_colnames=True)
+        r_ap = association_rules(fi_ap, metric="confidence", min_threshold=min_conf) if not fi_ap.empty else pd.DataFrame()
+        
+        if not r_ap.empty:
+            fig2, ax2 = plt.subplots(figsize=(6, 4))
+            sc = ax2.scatter(r_ap['support'], r_ap['confidence'], c=r_ap['lift'], cmap='viridis', s=60, alpha=0.85)
+            plt.colorbar(sc, label='Lift Ratio')
+            ax2.set_xlabel('Support')
+            ax2.set_ylabel('Confidence')
+            ax2.grid(True, linestyle='--', alpha=0.5)
+            st.pyplot(fig2)
+        else:
+            st.info("Scatter plot memerlukan data aturan asosiasi.")
+
+# =========================================================
+# MENU 4: GRAFIK & FILTER PENJUALAN
+# =========================================================
+elif menu_pilihan == "📊 Grafik & Filter Penjualan":
+    st.title("📊 Filter Data Penjualan & Grafik Tren Bulanan")
+    st.markdown("Gunakan filter di sidebar sebelah kiri untuk menyaring data transaksi pelanggan, ukuran produk, dan periode bulan.")
+    st.markdown("---")
+
+    # Terapkan Filter ke DataFrame
+    df_filtered = df_clean.copy()
+    if pilih_pelanggan != 'Semua Pelanggan':
+        df_filtered = df_filtered[df_filtered['CUSTOMER'] == pilih_pelanggan]
+    if pilih_bulan != 'Semua Bulan':
+        df_filtered = df_filtered[df_filtered['BULAN'] == pilih_bulan]
+    if pilih_ukuran != 'Semua Ukuran':
+        df_filtered = df_filtered[df_filtered['ITEM'] == pilih_ukuran]
+
+    # Metrik Hasil Filter
+    col_f1, col_f2, col_f3 = st.columns(3)
+    col_f1.metric("Total Baris Data Sesuai Filter", f"{len(df_filtered):,}")
+    col_f2.metric("Jumlah Transaksi Unik", f"{df_filtered['ID TRANSAKSI'].nunique():,}")
+    col_f3.metric("Total Qty Terjual", f"{df_filtered['QTY'].sum():,.0f}" if 'QTY' in df_filtered.columns else "N/A")
+
+    st.markdown("---")
+
+    # Visualisasi Grafik Penjualan Bulanan
+    st.subheader("📈 Grafik Tren Penjualan Berdasarkan Bulan")
+    if 'TANGGAL' in df_clean.columns and 'QTY' in df_clean.columns:
+        df_trend = df_filtered.dropna(subset=['BULAN_NUM']).groupby(df_filtered['BULAN_NUM'].astype(str))['QTY'].sum().reset_index()
+        
+        fig_trend, ax_trend = plt.subplots(figsize=(10, 4))
+        sns.lineplot(data=df_trend, x='BULAN_NUM', y='QTY', marker='o', color='#2ca02c', linewidth=2.5, ax=ax_trend)
+        ax_trend.set_title("Total Kuantitas Penjualan per Bulan (Berdasarkan Filter)", fontsize=12, fontweight='bold')
+        ax_trend.set_xlabel("Bulan", fontweight='bold')
+        ax_trend.set_ylabel("Total Qty Penjualan", fontweight='bold')
+        plt.xticks(rotation=45)
+        ax_trend.grid(True, linestyle='--', alpha=0.6)
+        st.pyplot(fig_trend)
     else:
-        st.warning("Tidak ditemukan aturan asosiasi yang memenuhi parameter support dan confidence tersebut. Coba turunkan nilainya di sidebar.")
+        st.info("Kolom 'TANGGAL' atau 'QTY' tidak tersedia untuk membuat grafik tren.")
+
+    st.markdown("---")
+    st.subheader("📋 Tabel Rincian Transaksi Terfilter")
+    st.dataframe(df_filtered[['TANGGAL', 'CUSTOMER', 'ID TRANSAKSI', 'ITEM', 'ITEM_KODE', 'QTY', 'HARGA', 'TOTAL']], use_container_width=True)
+
+# =========================================================
+# MENU 5: PARAMETER MODEL
+# =========================================================
+elif menu_pilihan == "⚙️ Parameter Model":
+    st.title("⚙️ Pengaturan Parameter Model")
+    st.markdown("Atur parameter uji minimum *Support* dan *Confidence* di bawah ini:")
+    st.markdown("---")
+
+    st.session_state.algo_choice = st.selectbox("Pilih Algoritma Utama:", ["Apriori", "FP-Growth"], index=0 if st.session_state.algo_choice=="Apriori" else 1)
+    st.session_state.min_supp = st.slider("Minimum Support", 0.001, 0.050, st.session_state.min_supp, 0.001, format="%.3f")
+    st.session_state.min_conf = st.slider("Minimum Confidence", 0.1, 0.9, st.session_state.min_conf, 0.1)
+
+    st.success("✅ Parameter berhasil diperbarui! Silakan kembali ke menu pilihan Anda melalui sidebar.")
