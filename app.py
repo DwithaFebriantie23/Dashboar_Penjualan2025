@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# CACHE DATA & PEMROSESAN KDD (DENGAN MAPPING ABJAD)
+# CACHE DATA & PEMROSESAN KDD (DENGAN STANDARISASI & MAPPING)
 # ---------------------------------------------------------
 @st.cache_data
 def load_and_process_data():
@@ -30,23 +30,19 @@ def load_and_process_data():
     df_clean['ID TRANSAKSI'] = df_clean['ID TRANSAKSI'].astype(str).str.strip()
     df_clean['ITEM'] = df_clean['ITEM'].astype(str).str.strip()
     
-    # --- PEMBERSIHAN NAMA CUSTOMER (STANDARISASI PENULISAN) ---
+    # --- STANDARISASI NAMA CUSTOMER (MENGGABUNGKAN PENULISAN MIRIP) ---
     df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
-    # Mengganti variasi penulisan "Bp. Acuy" / "BP. Acuy" menjadi seragam "Bp Acuy"
     df_clean['CUSTOMER'] = df_clean['CUSTOMER'].replace({
         'BP. Acuy': 'Bp Acuy',
         'Bp. Acuy': 'Bp Acuy'
-        # Anda bisa menambahkan penulisan lain di sini jika ada yang mirip, misal:
-        # 'CV. Arjuna': 'CV Arjuna Teknik'
     }, regex=True)
     
-    # --- PENANGANAN TOTAL & HARGA YANG 0 ATAU KOSONG ---
-    # Pastikan QTY, HARGA, dan TOTAL berupa angka numerik
+    # --- PEMBERSIHAN & KALKULASI OTOMATIS NILAI TOTAL 0 ---
     df_clean['QTY'] = pd.to_numeric(df_clean['QTY'], errors='coerce').fillna(0)
     df_clean['HARGA'] = pd.to_numeric(df_clean['HARGA'], errors='coerce').fillna(0)
     df_clean['TOTAL'] = pd.to_numeric(df_clean['TOTAL'], errors='coerce').fillna(0)
     
-    # Jika di Excel nilai TOTAL 0 atau kosong tapi QTY dan HARGA ada, hitung otomatis: QTY * HARGA
+    # Jika TOTAL 0 tapi HARGA & QTY ada, hitung otomatis QTY * HARGA
     mask_zero = df_clean['TOTAL'] == 0
     df_clean.loc[mask_zero & (df_clean['HARGA'] > 0), 'TOTAL'] = (
         df_clean['QTY'] * df_clean['HARGA']
@@ -79,8 +75,15 @@ def load_and_process_data():
     
     return df_clean, item_mapping, reverse_mapping, basket_sets
 
+try:
+    df_clean, item_mapping, reverse_mapping, basket_sets = load_and_process_data()
+except Exception as e:
+    st.error(f"Gagal memuat file dataset `Penjualan2025.xlsx`: {e}")
+    st.info("Pastikan file `Penjualan2025.xlsx` berada di direktori folder yang sama dengan `app.py`.")
+    st.stop()
+
 # ---------------------------------------------------------
-# SIDEBAR: HANYA NAVIGASI UTAMA
+# SIDEBAR: NAVIGASI UTAMA
 # ---------------------------------------------------------
 st.sidebar.title("📌 Navigasi Menu")
 menu_pilihan = st.sidebar.radio(
@@ -122,7 +125,7 @@ if menu_pilihan == "🏠 Home / Beranda":
     st.markdown("""
     * **Metodologi:** Knowledge Discovery in Databases (KDD)
     * **Dataset:** Rekapitulasi Penjualan Tahun 2025 (`Penjualan2025.xlsx`)
-    * **Preprocessing:** Pembersihan data kosong, 5 kali Pengujian Apriori dan FP-Growth serta Pengelompokan ukuran item fisik ke kode abjad ($A, B, \dots, Z, AA, \dots$).
+    * **Preprocessing:** Pembersihan data kosong, standarisasi nama pelanggan, 5 kali Pengujian Apriori dan FP-Growth serta Pengelompokan ukuran item fisik ke kode abjad ($A, B, \dots, Z, AA, \dots$).
     """)
         
     st.markdown("---")
@@ -399,7 +402,7 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
         st.warning("⚠️ Tidak ada data transaksi yang cocok dengan kombinasi filter yang Anda pilih.")
 
 # =========================================================
-# MENU 5: PARAMETER MODEL (DIPERBARUI MENJADI INTERAKTIF & INFORMATIF)
+# MENU 5: PARAMETER MODEL
 # =========================================================
 elif menu_pilihan == "⚙️ Parameter Model":
     st.title("⚙️ Pengaturan & Simulasi Parameter Model")
@@ -417,7 +420,6 @@ elif menu_pilihan == "⚙️ Parameter Model":
     st.markdown("---")
     st.info(f"⚡ Menjalankan simulasi menggunakan algoritma **{st.session_state.algo_choice}** dengan Min Support = **{st.session_state.min_supp}** dan Min Confidence = **{st.session_state.min_conf}**...")
 
-    # Eksekusi Algoritma Berdasarkan Parameter Simulasi
     with st.spinner("Memproses perhitungan data mining..."):
         start_time = time.perf_counter()
         if st.session_state.algo_choice == "Apriori":
@@ -428,7 +430,6 @@ elif menu_pilihan == "⚙️ Parameter Model":
             rules_sim = association_rules(fi_sim, metric="confidence", min_threshold=st.session_state.min_conf) if not fi_sim.empty else pd.DataFrame()
         sim_duration = time.perf_counter() - start_time
 
-    # Tampilkan Metrik Simulasi
     m_s1, m_s2, m_s3 = st.columns(3)
     m_s1.metric("Waktu Eksekusi Simulasi", f"{sim_duration:.4f} detik")
     m_s2.metric("Jumlah Frequent Itemsets", f"{len(fi_sim):,}")
@@ -446,7 +447,6 @@ elif menu_pilihan == "⚙️ Parameter Model":
         preview_df.columns = ['Antecedents (Kode & Ukuran)', 'Consequents (Kode & Ukuran)', 'Support', 'Confidence', 'Lift Ratio']
         st.dataframe(preview_df, use_container_width=True)
 
-        # Tombol Unduh Hasil Simulasi
         csv_data = rules_sim.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="📥 Unduh Hasil Simulasi Aturan Asosiasi (CSV)",
