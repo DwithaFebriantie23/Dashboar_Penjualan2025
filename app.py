@@ -315,13 +315,11 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     st.markdown("Gunakan kotak filter di bawah ini untuk menyaring data transaksi berdasarkan Nama Pelanggan, Bulan Transaksi, atau Ukuran Item (Kode Abjad).")
     st.markdown("---")
 
-    # --- WIDGET FILTER INTERAKTIF DI DALAM HALAMAN ---
     st.subheader("🔍 Parameter Filter Interaktif")
     f_col1, f_col2, f_col3 = st.columns(3)
 
     list_pelanggan = ['Semua Pelanggan'] + sorted(df_clean['CUSTOMER'].unique().tolist())
 
-    # Urutan bulan kronologis (Januari - Desember)
     bulan_urutan = {
         1: 'January 2025', 2: 'February 2025', 3: 'March 2025', 4: 'April 2025',
         5: 'May 2025', 6: 'June 2025', 7: 'July 2025', 8: 'August 2025',
@@ -330,7 +328,6 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     available_months_num = sorted(df_clean['MONTH_NUM'].dropna().unique().astype(int).tolist())
     list_bulan = ['Semua Bulan'] + [df_clean[df_clean['MONTH_NUM'] == m]['BULAN'].iloc[0] for m in available_months_num if m in bulan_urutan]
 
-    # Format ukuran item: "A - 50x50x3x38"
     formatted_items = [f"{code} - {item}" for item, code in sorted(item_mapping.items(), key=lambda x: x[1])]
     list_ukuran = ['Semua Ukuran'] + formatted_items
 
@@ -343,7 +340,6 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
 
     st.markdown("---")
 
-    # Terapkan Filter ke DataFrame
     df_filtered = df_clean.copy()
     if pilih_pelanggan != 'Semua Pelanggan':
         df_filtered = df_filtered[df_filtered['CUSTOMER'] == pilih_pelanggan]
@@ -353,7 +349,6 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
         selected_item_name = pilih_ukuran.split(" - ", 1)[1]
         df_filtered = df_filtered[df_filtered['ITEM'] == selected_item_name]
 
-    # Metrik Hasil Filter
     col_f1, col_f2, col_f3, col_f4 = st.columns(4)
     col_f1.metric("Total Baris Sesuai Filter", f"{len(df_filtered):,}")
     col_f2.metric("Jumlah Transaksi Unik", f"{df_filtered['ID TRANSAKSI'].nunique():,}")
@@ -362,7 +357,6 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
 
     st.markdown("---")
 
-    # Visualisasi Grafik Penjualan Bulanan Berdasarkan Filter
     st.subheader("📈 Grafik Tren Penjualan per Bulan")
     if 'TANGGAL' in df_clean.columns and 'QTY' in df_clean.columns:
         df_trend_all = pd.DataFrame({'MONTH_NUM': range(1, 13)})
@@ -391,15 +385,60 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
         st.warning("⚠️ Tidak ada data transaksi yang cocok dengan kombinasi filter yang Anda pilih.")
 
 # =========================================================
-# MENU 5: PARAMETER MODEL
+# MENU 5: PARAMETER MODEL (DIPERBARUI MENJADI INTERAKTIF & INFORMATIF)
 # =========================================================
 elif menu_pilihan == "⚙️ Parameter Model":
-    st.title("⚙️ Pengaturan Parameter Model")
-    st.markdown("Atur parameter uji minimum *Support* dan *Confidence* di bawah ini:")
+    st.title("⚙️ Pengaturan & Simulasi Parameter Model")
+    st.markdown("Atur parameter uji minimum *Support* dan *Confidence* di bawah ini untuk melihat hasil simulasi pembentukan aturan asosiasi secara *real-time*.")
     st.markdown("---")
 
-    st.session_state.algo_choice = st.selectbox("Pilih Algoritma Utama:", ["Apriori", "FP-Growth"], index=0 if st.session_state.algo_choice=="Apriori" else 1)
-    st.session_state.min_supp = st.slider("Minimum Support", 0.001, 0.050, st.session_state.min_supp, 0.001, format="%.3f")
-    st.session_state.min_conf = st.slider("Minimum Confidence", 0.1, 0.9, st.session_state.min_conf, 0.1)
+    col_p1, col_p2, col_p3 = st.columns(3)
+    with col_p1:
+        st.session_state.algo_choice = st.selectbox("Pilih Algoritma Utama:", ["FP-Growth", "Apriori"], index=0 if st.session_state.algo_choice=="FP-Growth" else 1)
+    with col_p2:
+        st.session_state.min_supp = st.slider("Minimum Support", 0.001, 0.050, st.session_state.min_supp, 0.001, format="%.3f")
+    with col_p3:
+        st.session_state.min_conf = st.slider("Minimum Confidence", 0.1, 0.9, st.session_state.min_conf, 0.1)
 
-    st.success("✅ Parameter berhasil diperbarui! Silakan kembali ke menu pilihan Anda melalui sidebar.")
+    st.markdown("---")
+    st.info(f"⚡ Menjalankan simulasi menggunakan algoritma **{st.session_state.algo_choice}** dengan Min Support = **{st.session_state.min_supp}** dan Min Confidence = **{st.session_state.min_conf}**...")
+
+    # Eksekusi Algoritma Berdasarkan Parameter Simulasi
+    with st.spinner("Memproses perhitungan data mining..."):
+        start_time = time.perf_counter()
+        if st.session_state.algo_choice == "Apriori":
+            fi_sim = apriori(basket_sets, min_support=st.session_state.min_supp, use_colnames=True)
+            rules_sim = association_rules(fi_sim, metric="confidence", min_threshold=st.session_state.min_conf) if not fi_sim.empty else pd.DataFrame()
+        else:
+            fi_sim = fpgrowth(basket_sets, min_support=st.session_state.min_supp, use_colnames=True)
+            rules_sim = association_rules(fi_sim, metric="confidence", min_threshold=st.session_state.min_conf) if not fi_sim.empty else pd.DataFrame()
+        sim_duration = time.perf_counter() - start_time
+
+    # Tampilkan Metrik Simulasi
+    m_s1, m_s2, m_s3 = st.columns(3)
+    m_s1.metric("Waktu Eksekusi Simulasi", f"{sim_duration:.4f} detik")
+    m_s2.metric("Jumlah Frequent Itemsets", f"{len(fi_sim):,}")
+    m_s3.metric("Jumlah Association Rules", f"{len(rules_sim):,}")
+
+    st.markdown("---")
+    st.subheader("📋 Hasil Preview Aturan Asosiasi (Simulasi)")
+
+    if not rules_sim.empty:
+        rules_sim['antecedents_full'] = rules_sim['antecedents'].apply(lambda x: ", ".join([f"{code} ({reverse_mapping[code]})" for code in x]))
+        rules_sim['consequents_full'] = rules_sim['consequents'].apply(lambda x: ", ".join([f"{code} ({reverse_mapping[code]})" for code in x]))
+        rules_sim = rules_sim.sort_values(by='lift', ascending=False)
+        
+        preview_df = rules_sim[['antecedents_full', 'consequents_full', 'support', 'confidence', 'lift']].head(15).copy()
+        preview_df.columns = ['Antecedents (Kode & Ukuran)', 'Consequents (Kode & Ukuran)', 'Support', 'Confidence', 'Lift Ratio']
+        st.dataframe(preview_df, use_container_width=True)
+
+        # Tombol Unduh Hasil Simulasi
+        csv_data = rules_sim.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Unduh Hasil Simulasi Aturan Asosiasi (CSV)",
+            data=csv_data,
+            file_name=f"Simulasi_Rules_{st.session_state.algo_choice}_Supp{st.session_state.min_supp}_Conf{st.session_state.min_conf}.csv",
+            mime="text/csv"
+        )
+    else:
+        st.warning("⚠️ Tidak ada aturan asosiasi yang terbentuk dengan kombinasi parameter tersebut. Coba turunkan nilai *Support* atau *Confidence*.")
