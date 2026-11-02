@@ -66,7 +66,7 @@ except Exception as e:
     st.stop()
 
 # ---------------------------------------------------------
-# SIDEBAR: NAVIGASI & FILTER GLOBAL
+# SIDEBAR: HANYA NAVIGASI UTAMA
 # ---------------------------------------------------------
 st.sidebar.title("📌 Navigasi Menu")
 menu_pilihan = st.sidebar.radio(
@@ -75,35 +75,13 @@ menu_pilihan = st.sidebar.radio(
         "🏠 Home / Beranda", 
         "📈 Hasil Analisis Data Mining", 
         "⚖️ Pengujian 5 Iterasi",
-        "📊 Grafik & Filter Penjualan",  # <--- Menu Utama untuk melihat hasil filter
+        "📊 Grafik & Filter Penjualan", 
         "⚙️ Parameter Model"
     ]
 )
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔍 Filter Data Interaktif")
-
-list_pelanggan = ['Semua Pelanggan'] + sorted(df_clean['CUSTOMER'].unique().tolist())
-
-# Urutan bulan secara kronologis (Januari - Desember)
-bulan_urutan = {
-    1: 'January 2025', 2: 'February 2025', 3: 'March 2025', 4: 'April 2025',
-    5: 'May 2025', 6: 'June 2025', 7: 'July 2025', 8: 'August 2025',
-    9: 'September 2025', 10: 'October 2025', 11: 'November 2025', 12: 'December 2025'
-}
-available_months_num = sorted(df_clean['MONTH_NUM'].dropna().unique().astype(int).tolist())
-list_bulan = ['Semua Bulan'] + [df_clean[df_clean['MONTH_NUM'] == m]['BULAN'].iloc[0] for m in available_months_num if m in bulan_urutan]
-
-# Format ukuran item abjad + ukuran asli (Contoh: "A - 50x50x3x38")
-formatted_items = [f"{code} - {item}" for item, code in sorted(item_mapping.items(), key=lambda x: x[1])]
-list_ukuran = ['Semua Ukuran'] + formatted_items
-
-pilih_pelanggan = st.sidebar.selectbox("Pilih Pelanggan:", list_pelanggan)
-pilih_bulan = st.sidebar.selectbox("Pilih Bulan Transaksi:", list_bulan)
-pilih_ukuran = st.sidebar.selectbox("Pilih Ukuran Item (Kode Abjad):", list_ukuran)
-
-st.sidebar.markdown("---")
-st.sidebar.info("💡 **Catatan:** Pastikan Anda membuka menu **📊 Grafik & Filter Penjualan** di atas untuk melihat rekapitulasi hasil filter.")
+st.sidebar.info("💡 **Tips:** Pilih menu di atas untuk berpindah halaman.")
 
 # Inisialisasi Session State Parameter Default
 if "min_supp" not in st.session_state:
@@ -126,24 +104,12 @@ if menu_pilihan == "🏠 Home / Beranda":
     
     st.markdown("---")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("### 👤 **Identitas Mahasiswa**")
-        st.markdown("""
-        * **Nama Lengkap:** Dwitha Febriantie
-        * **NIM:** 43230130
-        * **Program Studi:** Sistem Informasi
-        * **Fakultas / Kampus:** STMIK IKMI Cirebon
-        * **Semester:** 8 (Akhir)
-        """)
-    
-    with col2:
-        st.markdown("### 📋 **Informasi Metodologi**")
-        st.markdown("""
-        * **Metodologi:** Knowledge Discovery in Databases (KDD)
-        * **Dataset:** Rekapitulasi Penjualan Tahun 2025 (`Penjualan2025.xlsx`)
-        * **Preprocessing:** Pembersihan data kosong, 5 kali Pengujian Apriori dan FP-Growth serta Pengelompokan ukuran item fisik ke kode abjad ($A, B, \dots, Z, AA, \dots$).
-        """)
+    st.markdown("### 📋 **Informasi Metodologi**")
+    st.markdown("""
+    * **Metodologi:** Knowledge Discovery in Databases (KDD)
+    * **Dataset:** Rekapitulasi Penjualan Tahun 2025 (`Penjualan2025.xlsx`)
+    * **Preprocessing:** Pembersihan data kosong, 5 kali Pengujian Apriori dan FP-Growth serta Pengelompokan ukuran item fisik ke kode abjad ($A, B, \dots, Z, AA, \dots$).
+    """)
         
     st.markdown("---")
     
@@ -346,7 +312,35 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
 # =========================================================
 elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     st.title("📊 Filter Data Penjualan & Grafik Tren Bulanan")
-    st.markdown("Gunakan filter di sidebar sebelah kiri untuk menyaring data transaksi berdasarkan pelanggan, bulan, maupun ukuran item (berbasis kode abjad).")
+    st.markdown("Gunakan kotak filter di bawah ini untuk menyaring data transaksi berdasarkan Nama Pelanggan, Bulan Transaksi, atau Ukuran Item (Kode Abjad).")
+    st.markdown("---")
+
+    # --- WIDGET FILTER INTERAKTIF DI DALAM HALAMAN ---
+    st.subheader("🔍 Parameter Filter Interaktif")
+    f_col1, f_col2, f_col3 = st.columns(3)
+
+    list_pelanggan = ['Semua Pelanggan'] + sorted(df_clean['CUSTOMER'].unique().tolist())
+
+    # Urutan bulan kronologis (Januari - Desember)
+    bulan_urutan = {
+        1: 'January 2025', 2: 'February 2025', 3: 'March 2025', 4: 'April 2025',
+        5: 'May 2025', 6: 'June 2025', 7: 'July 2025', 8: 'August 2025',
+        9: 'September 2025', 10: 'October 2025', 11: 'November 2025', 12: 'December 2025'
+    }
+    available_months_num = sorted(df_clean['MONTH_NUM'].dropna().unique().astype(int).tolist())
+    list_bulan = ['Semua Bulan'] + [df_clean[df_clean['MONTH_NUM'] == m]['BULAN'].iloc[0] for m in available_months_num if m in bulan_urutan]
+
+    # Format ukuran item: "A - 50x50x3x38"
+    formatted_items = [f"{code} - {item}" for item, code in sorted(item_mapping.items(), key=lambda x: x[1])]
+    list_ukuran = ['Semua Ukuran'] + formatted_items
+
+    with f_col1:
+        pilih_pelanggan = st.selectbox("Pilih Pelanggan:", list_pelanggan)
+    with f_col2:
+        pilih_bulan = st.selectbox("Pilih Bulan Transaksi:", list_bulan)
+    with f_col3:
+        pilih_ukuran = st.selectbox("Pilih Ukuran Item (Kode Abjad):", list_ukuran)
+
     st.markdown("---")
 
     # Terapkan Filter ke DataFrame
@@ -356,13 +350,12 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     if pilih_bulan != 'Semua Bulan':
         df_filtered = df_filtered[df_filtered['BULAN'] == pilih_bulan]
     if pilih_ukuran != 'Semua Ukuran':
-        # Ekstrak nama item asli dari format "A - 50x50x3x38"
         selected_item_name = pilih_ukuran.split(" - ", 1)[1]
         df_filtered = df_filtered[df_filtered['ITEM'] == selected_item_name]
 
     # Metrik Hasil Filter
     col_f1, col_f2, col_f3, col_f4 = st.columns(4)
-    col_f1.metric("Total Baris Data Sesuai Filter", f"{len(df_filtered):,}")
+    col_f1.metric("Total Baris Sesuai Filter", f"{len(df_filtered):,}")
     col_f2.metric("Jumlah Transaksi Unik", f"{df_filtered['ID TRANSAKSI'].nunique():,}")
     col_f3.metric("Total Qty Terjual", f"{df_filtered['QTY'].sum():,.0f}" if 'QTY' in df_filtered.columns else "N/A")
     col_f4.metric("Total Nilai Penjualan", f"Rp {df_filtered['TOTAL'].sum():,.0f}" if 'TOTAL' in df_filtered.columns else "N/A")
@@ -372,12 +365,10 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     # Visualisasi Grafik Penjualan Bulanan Berdasarkan Filter
     st.subheader("📈 Grafik Tren Penjualan per Bulan")
     if 'TANGGAL' in df_clean.columns and 'QTY' in df_clean.columns:
-        # Buat dataframe tren lengkap dari Januari (1) sampai Desember (12)
         df_trend_all = pd.DataFrame({'MONTH_NUM': range(1, 13)})
         df_grouped = df_filtered.groupby('MONTH_NUM')['QTY'].sum().reset_index()
         df_trend_merged = pd.merge(df_trend_all, df_grouped, on='MONTH_NUM', how='left').fillna(0)
         
-        # Mapping nomor bulan ke nama bulan agar rapi secara kronologis
         month_names_map = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun', 
                            7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
         df_trend_merged['Bulan_Label'] = df_trend_merged['MONTH_NUM'].map(month_names_map)
@@ -397,7 +388,7 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     if not df_filtered.empty:
         st.dataframe(df_filtered[['TANGGAL', 'CUSTOMER', 'ID TRANSAKSI', 'ITEM', 'ITEM_KODE', 'QTY', 'HARGA', 'TOTAL']], use_container_width=True)
     else:
-        st.warning("⚠️ Tidak ada data transaksi yang cocok dengan kombinasi filter yang dipilih.")
+        st.warning("⚠️ Tidak ada data transaksi yang cocok dengan kombinasi filter yang Anda pilih.")
 
 # =========================================================
 # MENU 5: PARAMETER MODEL
