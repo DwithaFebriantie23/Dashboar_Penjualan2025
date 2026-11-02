@@ -326,11 +326,11 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
             st.info("Scatter plot memerlukan data aturan asosiasi.")
 
 # =========================================================
-# MENU 4: GRAFIK & FILTER PENJUALAN
+# MENU: GRAFIK & FILTER PENJUALAN
 # =========================================================
 elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     st.title("📊 Filter Data Penjualan & Grafik Tren Bulanan")
-    st.markdown("Gunakan filter di sidebar sebelah kiri untuk menyaring data transaksi pelanggan, ukuran produk, dan periode bulan.")
+    st.markdown("Gunakan filter di sidebar sebelah kiri untuk menyaring data transaksi berdasarkan pelanggan, bulan, atau kode abjad ukuran item.")
     st.markdown("---")
 
     # Terapkan Filter ke DataFrame
@@ -340,7 +340,9 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     if pilih_bulan != 'Semua Bulan':
         df_filtered = df_filtered[df_filtered['BULAN'] == pilih_bulan]
     if pilih_ukuran != 'Semua Ukuran':
-        df_filtered = df_filtered[df_filtered['ITEM'] == pilih_ukuran]
+        # Ekstrak kembali kode abjad atau nama item asli dari string terpilih (misal: "A (50x50...)" -> ambil item aslinya)
+        selected_item_name = pilih_ukuran.split(" (")[1][:-1]
+        df_filtered = df_filtered[df_filtered['ITEM'] == selected_item_name]
 
     # Metrik Hasil Filter
     col_f1, col_f2, col_f3 = st.columns(3)
@@ -369,7 +371,6 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     st.markdown("---")
     st.subheader("📋 Tabel Rincian Transaksi Terfilter")
     st.dataframe(df_filtered[['TANGGAL', 'CUSTOMER', 'ID TRANSAKSI', 'ITEM', 'ITEM_KODE', 'QTY', 'HARGA', 'TOTAL']], use_container_width=True)
-
 # =========================================================
 # MENU 5: PARAMETER MODEL
 # =========================================================
