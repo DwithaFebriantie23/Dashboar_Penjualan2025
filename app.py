@@ -75,7 +75,7 @@ menu_pilihan = st.sidebar.radio(
         "🏠 Home / Beranda", 
         "📈 Hasil Analisis Data Mining", 
         "⚖️ Pengujian 5 Iterasi",
-        "📊 Grafik & Filter Penjualan",  # <--- Menu Baru Filter & Grafik
+        "📊 Grafik & Filter Penjualan", 
         "⚙️ Parameter Model"
     ]
 )
@@ -85,22 +85,17 @@ st.sidebar.subheader("🔍 Filter Data Interaktif")
 
 list_pelanggan = ['Semua Pelanggan'] + sorted(df_clean['CUSTOMER'].unique().tolist())
 list_bulan = ['Semua Bulan'] + sorted(df_clean['BULAN'].dropna().unique().tolist())
-list_ukuran = ['Semua Ukuran'] + sorted(df_clean['ITEM'].unique().tolist())
+
+# Membuat pilihan ukuran item berbasis Abjad + Ukuran Asli (Contoh: "A - 50x50x3x38")
+formatted_items = [f"{code} ({item})" for item, code in sorted(item_mapping.items(), key=lambda x: x[1])]
+list_ukuran = ['Semua Ukuran'] + formatted_items
 
 pilih_pelanggan = st.sidebar.selectbox("Pilih Pelanggan:", list_pelanggan)
 pilih_bulan = st.sidebar.selectbox("Pilih Bulan Transaksi:", list_bulan)
-pilih_ukuran = st.sidebar.selectbox("Pilih Ukuran Item:", list_ukuran)
+pilih_ukuran = st.sidebar.selectbox("Pilih Ukuran Item (Kode Abjad):", list_ukuran)
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Tips:** Gunakan menu di atas untuk berpindah halaman.")
-
-# Inisialisasi Session State Parameter Default
-if "min_supp" not in st.session_state:
-    st.session_state.min_supp = 0.005
-if "min_conf" not in st.session_state:
-    st.session_state.min_conf = 0.10
-if "algo_choice" not in st.session_state:
-    st.session_state.algo_choice = "FP-Growth"
+st.sidebar.info("💡 **Tips:** Filter interaktif dan grafik tren terdapat di menu **📊 Grafik & Filter Penjualan**.")
 
 # =========================================================
 # MENU 1: HOME / BERANDA
