@@ -29,7 +29,28 @@ def load_and_process_data():
     df_clean = df_raw.dropna(subset=['ITEM', 'ID TRANSAKSI']).copy()
     df_clean['ID TRANSAKSI'] = df_clean['ID TRANSAKSI'].astype(str).str.strip()
     df_clean['ITEM'] = df_clean['ITEM'].astype(str).str.strip()
+    
+    # --- PEMBERSIHAN NAMA CUSTOMER (STANDARISASI PENULISAN) ---
     df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
+    # Mengganti variasi penulisan "Bp. Acuy" / "BP. Acuy" menjadi seragam "Bp Acuy"
+    df_clean['CUSTOMER'] = df_clean['CUSTOMER'].replace({
+        'BP. Acuy': 'Bp Acuy',
+        'Bp. Acuy': 'Bp Acuy'
+        # Anda bisa menambahkan penulisan lain di sini jika ada yang mirip, misal:
+        # 'CV. Arjuna': 'CV Arjuna Teknik'
+    }, regex=True)
+    
+    # --- PENANGANAN TOTAL & HARGA YANG 0 ATAU KOSONG ---
+    # Pastikan QTY, HARGA, dan TOTAL berupa angka numerik
+    df_clean['QTY'] = pd.to_numeric(df_clean['QTY'], errors='coerce').fillna(0)
+    df_clean['HARGA'] = pd.to_numeric(df_clean['HARGA'], errors='coerce').fillna(0)
+    df_clean['TOTAL'] = pd.to_numeric(df_clean['TOTAL'], errors='coerce').fillna(0)
+    
+    # Jika di Excel nilai TOTAL 0 atau kosong tapi QTY dan HARGA ada, hitung otomatis: QTY * HARGA
+    mask_zero = df_clean['TOTAL'] == 0
+    df_clean.loc[mask_zero & (df_clean['HARGA'] > 0), 'TOTAL'] = (
+        df_clean['QTY'] * df_clean['HARGA']
+    )
     
     # Ekstraksi Tanggal & Bulan Kronologis (Januari - Desember)
     df_clean['TANGGAL'] = pd.to_datetime(df_clean['TANGGAL'], errors='coerce')
@@ -57,13 +78,6 @@ def load_and_process_data():
     basket_sets = basket.map(lambda x: True if x > 0 else False)
     
     return df_clean, item_mapping, reverse_mapping, basket_sets
-
-try:
-    df_clean, item_mapping, reverse_mapping, basket_sets = load_and_process_data()
-except Exception as e:
-    st.error(f"Gagal memuat file dataset `Penjualan2025.xlsx`: {e}")
-    st.info("Pastikan file `Penjualan2025.xlsx` berada di direktori folder yang sama dengan `app.py`.")
-    st.stop()
 
 # ---------------------------------------------------------
 # SIDEBAR: HANYA NAVIGASI UTAMA
