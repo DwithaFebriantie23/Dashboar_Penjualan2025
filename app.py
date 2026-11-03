@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# CACHE DATA & PEMROSESAN KDD (DENGAN STANDARISASI & MAPPING)
+# CACHE DATA & PEMROSESAN KDD (SINKRON DENGAN GOOGLE COLAB)
 # ---------------------------------------------------------
 @st.cache_data
 def load_and_process_data():
@@ -30,19 +30,23 @@ def load_and_process_data():
     df_clean['ID TRANSAKSI'] = df_clean['ID TRANSAKSI'].astype(str).str.strip()
     df_clean['ITEM'] = df_clean['ITEM'].astype(str).str.strip()
     
-    # --- STANDARISASI NAMA CUSTOMER (MENGGABUNGKAN PENULISAN MIRIP) ---
+    # --- 1. KOREKSI KESALAHAN PENULISAN (TYPO) UKURAN ITEM ---
+    df_clean['ITEM'] = df_clean['ITEM'].replace({
+        '100100x': '100x100x'
+    }, regex=True)
+    
+    # --- 2. STANDARISASI NAMA CUSTOMER ---
     df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
     df_clean['CUSTOMER'] = df_clean['CUSTOMER'].replace({
         'BP. Acuy': 'Bp Acuy',
         'Bp. Acuy': 'Bp Acuy'
     }, regex=True)
     
-    # --- PEMBERSIHAN & KALKULASI OTOMATIS NILAI TOTAL 0 ---
+    # --- 3. PEMBERSIHAN & KALKULASI OTOMATIS NILAI TOTAL 0 ---
     df_clean['QTY'] = pd.to_numeric(df_clean['QTY'], errors='coerce').fillna(0)
     df_clean['HARGA'] = pd.to_numeric(df_clean['HARGA'], errors='coerce').fillna(0)
     df_clean['TOTAL'] = pd.to_numeric(df_clean['TOTAL'], errors='coerce').fillna(0)
     
-    # Jika TOTAL 0 tapi HARGA & QTY ada, hitung otomatis QTY * HARGA
     mask_zero = df_clean['TOTAL'] == 0
     df_clean.loc[mask_zero & (df_clean['HARGA'] > 0), 'TOTAL'] = (
         df_clean['QTY'] * df_clean['HARGA']
@@ -125,7 +129,7 @@ if menu_pilihan == "🏠 Home / Beranda":
     st.markdown("""
     * **Metodologi:** Knowledge Discovery in Databases (KDD)
     * **Dataset:** Rekapitulasi Penjualan Tahun 2025 (`Penjualan2025.xlsx`)
-    * **Preprocessing:** Pembersihan data kosong, standarisasi nama pelanggan, 5 kali Pengujian Apriori dan FP-Growth serta Pengelompokan ukuran item fisik ke kode abjad ($A, B, \dots, Z, AA, \dots$).
+    * **Preprocessing:** Pembersihan data kosong, standarisasi nama pelanggan, koreksi typo ukuran item, 5 kali Pengujian Apriori & FP-Growth, serta Pengelompokan ukuran item fisik ke kode abjad ($A, B, \dots, Z, AA, \dots$).
     """)
         
     st.markdown("---")
