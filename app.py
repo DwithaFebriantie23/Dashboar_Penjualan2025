@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import string
 import time
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -18,7 +17,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# CACHE DATA & PEMROSESAN KDD (SINKRON DENGAN GOOGLE COLAB)
+# CACHE DATA & PEMROSESAN KDD (DENGAN PELABELAN HIERARKI RUMPUN)
 # ---------------------------------------------------------
 @st.cache_data
 def load_and_process_data():
@@ -57,21 +56,74 @@ def load_and_process_data():
     df_clean['MONTH_NUM'] = df_clean['TANGGAL'].dt.month
     df_clean['BULAN'] = df_clean['TANGGAL'].dt.strftime('%B %Y')
     
-    # Data Transformation (Pengelompokan Ukuran Item ke Abjad A-Z, AA, dst.)
-    unique_items = sorted(df_clean['ITEM'].unique())
-    
-    def get_excel_style_label(n):
-        label = ''
-        while n >= 0:
-            label = string.ascii_uppercase[n % 26] + label
-            n = n // 26 - 1
-        return label
+    # --- 4. PELABELAN HIERARKI RUMPUN DIMENSI (R01-01, R07-20, dst.) ---
+    def get_prefix_sort_key(prefix_str):
+        if 'kraft' in prefix_str.lower():
+            return (999, 999, 999)
+        parts = prefix_str.replace('X', 'x').replace(',', '.').split('x')
+        nums = []
+        for p in parts:
+            try:
+                nums.append(float(p))
+            except:
+                nums.append(0)
+        while len(nums) < 3:
+            nums.append(0)
+        return tuple(nums)
 
-    item_mapping = {item: get_excel_style_label(i) for i, item in enumerate(unique_items)}
+    def parse_item_full(item_str):
+        item_clean = str(item_str).strip()
+        if 'kraft' in item_clean.lower():
+            return 'Kraft Paper', 0, item_clean
+        norm = item_clean.replace('X', 'x').replace(' ', '').replace(',', '.')
+        parts = norm.split('x')
+        if len(parts) >= 4:
+            prefix = f"{parts[0]}x{parts[1]}x{parts[2]}"
+            try: length = float(parts[3])
+            except: length = 0
+        elif len(parts) == 3:
+            prefix = f"{parts[0]}x{parts[1]}"
+            try: length = float(parts[2])
+            except: length = 0
+        elif len(parts) == 2:
+            prefix = parts[0]
+            try: length = float(parts[1])
+            except: length = 0
+        else:
+            prefix = item_clean
+            length = 0
+        return prefix, length, item_clean
+
+    unique_items = df_clean['ITEM'].unique()
+    catalog = []
+    for item in unique_items:
+        prefix, length, raw = parse_item_full(item)
+        catalog.append({
+            'ITEM_ORIGINAL': item,
+            'PREFIX': prefix,
+            'LENGTH': length,
+            'SORT_KEY': get_prefix_sort_key(prefix)
+        })
+
+    df_cat = pd.DataFrame(catalog)
+    unique_prefixes = df_cat[['PREFIX', 'SORT_KEY']].drop_duplicates().sort_values('SORT_KEY').reset_index(drop=True)
+    unique_prefixes['RUMPUN_NO'] = range(1, len(unique_prefixes) + 1)
+    prefix_to_rumpun = dict(zip(unique_prefixes['PREFIX'], unique_prefixes['RUMPUN_NO']))
+
+    df_cat['RUMPUN_NO'] = df_cat['PREFIX'].map(prefix_to_rumpun)
+    df_cat = df_cat.sort_values(by=['SORT_KEY', 'LENGTH', 'ITEM_ORIGINAL']).reset_index(drop=True)
+
+    item_mapping = {}
+    for prefix, group in df_cat.groupby('PREFIX', sort=False):
+        r_no = prefix_to_rumpun[prefix]
+        for rank, (idx, row) in enumerate(group.iterrows(), 1):
+            code = f"R{r_no:02d}-{rank:02d}"
+            item_mapping[row['ITEM_ORIGINAL']] = code
+
     reverse_mapping = {v: k for k, v in item_mapping.items()}
     df_clean['ITEM_KODE'] = df_clean['ITEM'].map(item_mapping)
     
-    # Basket Matrix (One-Hot Encoding berdasarkan Kode Abjad)
+    # Basket Matrix (One-Hot Encoding berdasarkan Kode Rumpun)
     basket = (df_clean.groupby(['ID TRANSAKSI', 'ITEM_KODE'])['ITEM_KODE']
               .count().unstack().reset_index().fillna(0)
               .set_index('ID TRANSAKSI'))
@@ -104,7 +156,7 @@ menu_pilihan = st.sidebar.radio(
 st.sidebar.markdown("---")
 st.sidebar.info("💡 **Tips:** Pilih menu di atas untuk berpindah halaman.")
 
-# Inisialisasi Session State Parameter Default
+# Inisialisasi Session State Parameter Default (Diset ke Min Support 0.005 & Confidence 0.1)
 if "min_supp" not in st.session_state:
     st.session_state.min_supp = 0.005
 if "min_conf" not in st.session_state:
@@ -117,7 +169,7 @@ if "algo_choice" not in st.session_state:
 # =========================================================
 if menu_pilihan == "🏠 Home / Beranda":
     st.title("📊 Dashboard PT. Cakrawala Kemasindo Lestari")
-    st.markdown("Analisis Pola Pembelian Produk (Ukuran Item Berbasis Abjad) Menggunakan Algoritma **Apriori** & **FP-Growth** (KDD Framework).")
+    st.markdown("Analisis Pola Pembelian Produk (Pelabelan Hierarki Rumpun Siku Besi) Menggunakan Algoritma **Apriori** & **FP-Growth** (KDD Framework).")
     st.markdown("---")
     
     st.subheader("🎓 Dashboard Penelitian Skripsi")
@@ -129,7 +181,7 @@ if menu_pilihan == "🏠 Home / Beranda":
     st.markdown("""
     * **Metodologi:** Knowledge Discovery in Databases (KDD)
     * **Dataset:** Rekapitulasi Penjualan Tahun 2025 (`Penjualan2025.xlsx`)
-    * **Preprocessing:** Pembersihan data kosong, standarisasi nama pelanggan, koreksi typo ukuran item, 5 kali Pengujian Apriori & FP-Growth, serta Pengelompokan ukuran item fisik ke kode abjad ($A, B, \dots, Z, AA, \dots$).
+    * **Preprocessing:** Pembersihan data kosong, standarisasi nama pelanggan, koreksi typo ukuran item, 5 kali Pengujian Komparatif Apriori & FP-Growth, serta Pelabelan Hierarki Rumpun Dimensi ($R01-01, R07-20, \dots$).
     """)
         
     st.markdown("---")
@@ -187,7 +239,7 @@ elif menu_pilihan == "📈 Hasil Analisis Data Mining":
     sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
         "🚀 Top 10 Rules (Bundling)", 
         "📈 Semua Aturan Asosiasi", 
-        "🔤 Kamus Kode Ukuran", 
+        "🔤 Kamus Kode Rumpun", 
         "📋 Data Transaksi Berkode"
     ])
 
@@ -197,7 +249,7 @@ elif menu_pilihan == "📈 Hasil Analisis Data Mining":
         
         if not rules.empty:
             top_10 = rules.head(10)[['antecedents_full', 'consequents_full', 'support', 'confidence', 'lift']].copy()
-            top_10.columns = ['Antecedents (Kode & Ukuran Asli)', 'Consequents (Kode & Ukuran Asli)', 'Support', 'Confidence', 'Lift Ratio']
+            top_10.columns = ['Antecedents (Kode Rumpun & Ukuran Asli)', 'Consequents (Kode Rumpun & Ukuran Asli)', 'Support', 'Confidence', 'Lift Ratio']
             st.dataframe(top_10, use_container_width=True)
         else:
             st.warning("Tidak ada aturan asosiasi yang ditemukan dengan parameter tersebut.")
@@ -210,13 +262,13 @@ elif menu_pilihan == "📈 Hasil Analisis Data Mining":
             st.warning("Data aturan asosiasi kosong.")
 
     with sub_tab3:
-        st.subheader("🔤 Kamus Referensi Pemetaan Ukuran Item ke Kode Abjad")
-        df_kamus = pd.DataFrame(list(item_mapping.items()), columns=['UKURAN_ITEM_ASLI', 'KODE_ABJAD'])
-        df_kamus = df_kamus.sort_values(by='KODE_ABJAD').reset_index(drop=True)
+        st.subheader("🔤 Kamus Referensi Pemetaan Ukuran Item ke Kode Rumpun Hierarki")
+        df_kamus = pd.DataFrame(list(item_mapping.items()), columns=['UKURAN_ITEM_ASLI', 'KODE_RUMPUN'])
+        df_kamus = df_kamus.sort_values(by='KODE_RUMPUN').reset_index(drop=True)
         st.dataframe(df_kamus, use_container_width=True)
 
     with sub_tab4:
-        st.subheader("📋 Pratinjau Data Transaksi Hasil Clean & Mapping Kode")
+        st.subheader("📋 Pratinjau Data Transaksi Hasil Clean & Mapping Kode Rumpun")
         st.dataframe(df_clean[['TANGGAL', 'CUSTOMER', 'ID TRANSAKSI', 'ITEM', 'ITEM_KODE', 'QTY']].head(100), use_container_width=True)
 
 # =========================================================
@@ -224,25 +276,25 @@ elif menu_pilihan == "📈 Hasil Analisis Data Mining":
 # =========================================================
 elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
     st.title("⚖️ Hasil Pengujian 5 Iterasi Komparatif")
-    st.markdown("Berikut adalah tabel rincian hasil pengujian komparatif 5 iterasi yang disesuaikan dengan hasil eksperimen terbaru pada Google Colab.")
+    st.markdown("Berikut adalah tabel rincian hasil pengujian komparatif 5 iterasi berdasarkan eksperimen Google Colab.")
     st.markdown("---")
 
     min_supp = st.session_state.min_supp
     min_conf = st.session_state.min_conf
 
     df_iter = pd.DataFrame([
-        {'Pengujian': 1, 'Waktu Apriori (detik)': 0.111713, 'Waktu FP-Growth (detik)': 0.296784, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': 2, 'Waktu Apriori (detik)': 0.029206, 'Waktu FP-Growth (detik)': 0.165974, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': 3, 'Waktu Apriori (detik)': 0.020686, 'Waktu FP-Growth (detik)': 0.152908, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': 4, 'Waktu Apriori (detik)': 0.020072, 'Waktu FP-Growth (detik)': 0.153038, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': 5, 'Waktu Apriori (detik)': 0.019503, 'Waktu FP-Growth (detik)': 0.453314, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0}
+        {'Pengujian': 1, 'Waktu Apriori (detik)': 0.035575, 'Waktu FP-Growth (detik)': 0.161609, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': 2, 'Waktu Apriori (detik)': 0.025463, 'Waktu FP-Growth (detik)': 0.153368, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': 3, 'Waktu Apriori (detik)': 0.021835, 'Waktu FP-Growth (detik)': 0.157712, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': 4, 'Waktu Apriori (detik)': 0.025998, 'Waktu FP-Growth (detik)': 0.152102, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': 5, 'Waktu Apriori (detik)': 0.022284, 'Waktu FP-Growth (detik)': 0.148704, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0}
     ])
 
     summary_df = pd.DataFrame([
         {
             'Pengujian': 'Rata-rata',
-            'Waktu Apriori (detik)': 0.040236,
-            'Waktu FP-Growth (detik)': 0.244403,
+            'Waktu Apriori (detik)': 0.026231,
+            'Waktu FP-Growth (detik)': 0.154699,
             'Frequent Itemsets Apriori': 126.0,
             'Frequent Itemsets FP-Growth': 126.0,
             'Association Rules Apriori': 86.0,
@@ -250,8 +302,8 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
         },
         {
             'Pengujian': 'Standar Deviasi',
-            'Waktu Apriori (detik)': 0.040154,
-            'Waktu FP-Growth (detik)': 0.131584,
+            'Waktu Apriori (detik)': 0.005542,
+            'Waktu FP-Growth (detik)': 0.005032,
             'Frequent Itemsets Apriori': float('nan'),
             'Frequent Itemsets FP-Growth': float('nan'),
             'Association Rules Apriori': float('nan'),
@@ -333,7 +385,7 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
 # =========================================================
 elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     st.title("📊 Filter Data Penjualan & Grafik Tren Bulanan")
-    st.markdown("Gunakan kotak filter di bawah ini untuk menyaring data transaksi berdasarkan Nama Pelanggan, Bulan Transaksi, atau Ukuran Item (Kode Abjad).")
+    st.markdown("Gunakan kotak filter di bawah ini untuk menyaring data transaksi.")
     st.markdown("---")
 
     st.subheader("🔍 Parameter Filter Interaktif")
@@ -357,7 +409,7 @@ elif menu_pilihan == "📊 Grafik & Filter Penjualan":
     with f_col2:
         pilih_bulan = st.selectbox("Pilih Bulan Transaksi:", list_bulan)
     with f_col3:
-        pilih_ukuran = st.selectbox("Pilih Ukuran Item (Kode Abjad):", list_ukuran)
+        pilih_ukuran = st.selectbox("Pilih Ukuran Item (Kode Rumpun):", list_ukuran)
 
     st.markdown("---")
 
@@ -448,7 +500,7 @@ elif menu_pilihan == "⚙️ Parameter Model":
         rules_sim = rules_sim.sort_values(by='lift', ascending=False)
         
         preview_df = rules_sim[['antecedents_full', 'consequents_full', 'support', 'confidence', 'lift']].head(15).copy()
-        preview_df.columns = ['Antecedents (Kode & Ukuran)', 'Consequents (Kode & Ukuran)', 'Support', 'Confidence', 'Lift Ratio']
+        preview_df.columns = ['Antecedents (Kode Rumpun & Ukuran)', 'Consequents (Kode Rumpun & Ukuran)', 'Support', 'Confidence', 'Lift Ratio']
         st.dataframe(preview_df, use_container_width=True)
 
         csv_data = rules_sim.to_csv(index=False).encode('utf-8')
