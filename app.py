@@ -17,37 +17,36 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# CACHE DATA & PEMROSESAN KDD (DENGAN PELABELAN HIERARKI RUMPUN)
+# CACHE DATA & PEMROSESAN KDD (DISELARASKAN DENGAN GOOGLE COLAB)
 # ---------------------------------------------------------
 @st.cache_data
 def load_and_process_data():
     file_path = "Penjualan2025.xlsx"
+    # Pastikan pembacaan sheet dan header disamakan dengan Colab Anda
     df_raw = pd.read_excel(file_path, sheet_name="Rekap 2025", header=1)
     
-    # Data Cleaning & Selection
+    # 1. Data Cleaning dasar (Buang baris kosong pada ITEM & ID TRANSAKSI)
     df_clean = df_raw.dropna(subset=['ITEM', 'ID TRANSAKSI']).copy()
     df_clean['ID TRANSAKSI'] = df_clean['ID TRANSAKSI'].astype(str).str.strip()
     df_clean['ITEM'] = df_clean['ITEM'].astype(str).str.strip()
     
-    # --- 1. KOREKSI KESALAHAN PENULISAN (TYPO) & CASE INSENSITIVITY PADA UKURAN ITEM ---
-    # Mengubah seluruh string menjadi huruf kapital agar 'x' kecil menjadi 'X' besar
+    # 2. Standarisasi Huruf Kapital & Pembersihan Spasi Konsisten
     df_clean['ITEM'] = df_clean['ITEM'].str.upper()
-    
-    # Menghapus spasi internal di dalam string ukuran (misal: "50 X 50" -> "50X50")
     df_clean['ITEM'] = df_clean['ITEM'].str.replace(r'\s+', '', regex=True)
     
+    # 3. Koreksi Typo Ukuran
     df_clean['ITEM'] = df_clean['ITEM'].replace({
         '100100X': '100X100X'
     }, regex=True)
     
-    # --- 2. STANDARISASI NAMA CUSTOMER ---
+    # 4. Standarisasi Nama Customer
     if 'CUSTOMER' in df_clean.columns:
         df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
         df_clean['CUSTOMER'] = df_clean['CUSTOMER'].replace({
             'BP. ACUY': 'BP ACUY'
         }, regex=True)
     
-    # --- 3. PEMBERSIHAN & KALKULASI OTOMATIS NILAI TOTAL 0 ---
+    # 5. Kalkulasi Otomatis Nilai Total 0
     df_clean['QTY'] = pd.to_numeric(df_clean['QTY'], errors='coerce').fillna(0)
     df_clean['HARGA'] = pd.to_numeric(df_clean['HARGA'], errors='coerce').fillna(0)
     df_clean['TOTAL'] = pd.to_numeric(df_clean['TOTAL'], errors='coerce').fillna(0)
@@ -57,7 +56,7 @@ def load_and_process_data():
         df_clean['QTY'] * df_clean['HARGA']
     )
     
-    # Ekstraksi Tanggal & Bulan Kronologis (Januari - Desember)
+    # Ekstraksi Tanggal & Bulan Kronologis
     if 'TANGGAL' in df_clean.columns:
         df_clean['TANGGAL'] = pd.to_datetime(df_clean['TANGGAL'], errors='coerce')
         df_clean['MONTH_NUM'] = df_clean['TANGGAL'].dt.month
@@ -66,7 +65,7 @@ def load_and_process_data():
         df_clean['MONTH_NUM'] = 1
         df_clean['BULAN'] = 'January 2025'
         
-    # --- 4. PELABELAN HIERARKI RUMPUN DIMENSI (R01-01, R07-20, dst.) ---
+    # 6. Fungsi Pelabelan Hierarki Rumpun (Sama persis dengan Colab)
     def get_prefix_sort_key(prefix_str):
         if 'kraft' in prefix_str.lower():
             return (999, 999, 999)
@@ -133,7 +132,7 @@ def load_and_process_data():
     reverse_mapping = {v: k for k, v in item_mapping.items()}
     df_clean['ITEM_KODE'] = df_clean['ITEM'].map(item_mapping)
     
-    # Basket Matrix (One-Hot Encoding berdasarkan Kode Rumpun)
+    # 7. One-Hot Encoding (Basket Matrix)
     basket = (df_clean.groupby(['ID TRANSAKSI', 'ITEM_KODE'])['ITEM_KODE']
               .count().unstack().reset_index().fillna(0)
               .set_index('ID TRANSAKSI'))
@@ -214,7 +213,6 @@ elif menu_pilihan == "📈 Hasil Analisis Data Mining":
     min_conf = st.session_state.min_conf
     algo_choice = st.session_state.algo_choice
 
-    # Eksekusi Single Run Algoritma
     with st.spinner("Sedang memproses algoritma..."):
         t0 = time.perf_counter()
         fi_ap = apriori(basket_sets, min_support=min_supp, use_colnames=True)
@@ -237,7 +235,6 @@ elif menu_pilihan == "📈 Hasil Analisis Data Mining":
         rules['consequents_full'] = rules['consequents'].apply(lambda x: ", ".join([f"{code} ({reverse_mapping[code]})" for code in x]))
         rules = rules.sort_values(by='lift', ascending=False)
 
-    # Metrik Ringkasan Atas
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Transaksi", f"{basket_sets.shape[0]:,}")
     c2.metric("Frequent Itemsets", f"{len(fi_active):,}")
@@ -484,41 +481,4 @@ elif menu_pilihan == "⚙️ Parameter Model":
         st.session_state.min_conf = st.slider("Minimum Confidence", 0.1, 0.9, st.session_state.min_conf, 0.1)
 
     st.markdown("---")
-    st.info(f"⚡ Menjalankan simulasi menggunakan algoritma **{st.session_state.algo_choice}** dengan Min Support = **{st.session_state.min_supp}** dan Min Confidence = **{st.session_state.min_conf}**...")
-
-    with st.spinner("Memproses perhitungan data mining..."):
-        start_time = time.perf_counter()
-        if st.session_state.algo_choice == "Apriori":
-            fi_sim = apriori(basket_sets, min_support=st.session_state.min_supp, use_colnames=True)
-            rules_sim = association_rules(fi_sim, metric="confidence", min_threshold=st.session_state.min_conf) if not fi_sim.empty else pd.DataFrame()
-        else:
-            fi_sim = fpgrowth(basket_sets, min_support=st.session_state.min_supp, use_colnames=True)
-            rules_sim = association_rules(fi_sim, metric="confidence", min_threshold=st.session_state.min_conf) if not fi_sim.empty else pd.DataFrame()
-        sim_duration = time.perf_counter() - start_time
-
-    m_s1, m_s2, m_s3 = st.columns(3)
-    m_s1.metric("Waktu Eksekusi Simulasi", f"{sim_duration:.4f} detik")
-    m_s2.metric("Jumlah Frequent Itemsets", f"{len(fi_sim):,}")
-    m_s3.metric("Jumlah Association Rules", f"{len(rules_sim):,}")
-
-    st.markdown("---")
-    st.subheader("📋 Hasil Preview Aturan Asosiasi (Simulasi)")
-
-    if not rules_sim.empty:
-        rules_sim['antecedents_full'] = rules_sim['antecedents'].apply(lambda x: ", ".join([f"{code} ({reverse_mapping[code]})" for code in x]))
-        rules_sim['consequents_full'] = rules_sim['consequents'].apply(lambda x: ", ".join([f"{code} ({reverse_mapping[code]})" for code in x]))
-        rules_sim = rules_sim.sort_values(by='lift', ascending=False)
-        
-        preview_df = rules_sim[['antecedents_full', 'consequents_full', 'support', 'confidence', 'lift']].head(15).copy()
-        preview_df.columns = ['Antecedents (Kode Rumpun & Ukuran)', 'Consequents (Kode Rumpun & Ukuran)', 'Support', 'Confidence', 'Lift Ratio']
-        st.dataframe(preview_df, use_container_width=True)
-
-        csv_data = rules_sim.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Unduh Hasil Simulasi Aturan Asosiasi (CSV)",
-            data=csv_data,
-            file_name=f"Simulasi_Rules_{st.session_state.algo_choice}_Supp{st.session_state.min_supp}_Conf{st.session_state.min_conf}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.warning("⚠️ Tidak ada aturan asosiasi yang terbentuk dengan kombinasi parameter tersebut. Coba turunkan nilai *Support* atau *Confidence*.")
+    st.info(f"⚡ Menjalankan simulasi menggunakan algoritma **{st.session_state.algo
