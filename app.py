@@ -481,4 +481,41 @@ elif menu_pilihan == "⚙️ Parameter Model":
         st.session_state.min_conf = st.slider("Minimum Confidence", 0.1, 0.9, st.session_state.min_conf, 0.1)
 
     st.markdown("---")
-    st.info(f"⚡ Menjalankan simulasi menggunakan algoritma **{st.session_state.algo
+    st.info(f"⚡ Menjalankan simulasi menggunakan algoritma **{st.session_state.algo_choice}** dengan Min Support = **{st.session_state.min_supp}** dan Min Confidence = **{st.session_state.min_conf}**...")
+
+    with st.spinner("Memproses perhitungan data mining..."):
+        start_time = time.perf_counter()
+        if st.session_state.algo_choice == "Apriori":
+            fi_sim = apriori(basket_sets, min_support=st.session_state.min_supp, use_colnames=True)
+            rules_sim = association_rules(fi_sim, metric="confidence", min_threshold=st.session_state.min_conf) if not fi_sim.empty else pd.DataFrame()
+        else:
+            fi_sim = fpgrowth(basket_sets, min_support=st.session_state.min_supp, use_colnames=True)
+            rules_sim = association_rules(fi_sim, metric="confidence", min_threshold=st.session_state.min_conf) if not fi_sim.empty else pd.DataFrame()
+        sim_duration = time.perf_counter() - start_time
+
+    m_s1, m_s2, m_s3 = st.columns(3)
+    m_s1.metric("Waktu Eksekusi Simulasi", f"{sim_duration:.4f} detik")
+    m_s2.metric("Jumlah Frequent Itemsets", f"{len(fi_sim):,}")
+    m_s3.metric("Jumlah Association Rules", f"{len(rules_sim):,}")
+
+    st.markdown("---")
+    st.subheader("📋 Hasil Preview Aturan Asosiasi (Simulasi)")
+
+    if not rules_sim.empty:
+        rules_sim['antecedents_full'] = rules_sim['antecedents'].apply(lambda x: ", ".join([f"{code} ({reverse_mapping[code]})" for code in x]))
+        rules_sim['consequents_full'] = rules_sim['consequents'].apply(lambda x: ", ".join([f"{code} ({reverse_mapping[code]})" for code in x]))
+        rules_sim = rules_sim.sort_values(by='lift', ascending=False)
+        
+        preview_df = rules_sim[['antecedents_full', 'consequents_full', 'support', 'confidence', 'lift']].head(15).copy()
+        preview_df.columns = ['Antecedents (Kode Rumpun & Ukuran)', 'Consequents (Kode Rumpun & Ukuran)', 'Support', 'Confidence', 'Lift Ratio']
+        st.dataframe(preview_df, use_container_width=True)
+
+        csv_data = rules_sim.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Unduh Hasil Simulasi Aturan Asosiasi (CSV)",
+            data=csv_data,
+            file_name=f"Simulasi_Rules_{st.session_state.algo_choice}_Supp{st.session_state.min_supp}_Conf{st.session_state.min_conf}.csv",
+            mime="text/csv"
+        )
+    else:
+        st.warning("⚠️ Tidak ada aturan asosiasi yang terbentuk dengan kombinasi parameter tersebut. Coba turunkan nilai *Support* atau *Confidence*.")
