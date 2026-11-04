@@ -39,12 +39,17 @@ def load_and_process_data():
         '100100X': '100X100X'
     }, regex=True)
     
-    # 4. Standarisasi Nama Customer
+    # --- STANDARISASI NAMA CUSTOMER ---
     if 'CUSTOMER' in df_clean.columns:
         df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
         df_clean['CUSTOMER'] = df_clean['CUSTOMER'].replace({
-            'BP. ACUY': 'BP ACUY'
+            'BP. ACUY': 'BP ACUY',
+            'Bp. Acuy': 'Bp Acuy',
+            'BPACUY': 'Bp Acuy'
         }, regex=True)
+        
+        # Opsional: Jika ingin menyeragamkan semuanya jadi huruf kapital atau Title Case
+        # df_clean['CUSTOMER'] = df_clean['CUSTOMER'].str.title()
     
     # 5. Kalkulasi Otomatis Nilai Total 0
     df_clean['QTY'] = pd.to_numeric(df_clean['QTY'], errors='coerce').fillna(0)
