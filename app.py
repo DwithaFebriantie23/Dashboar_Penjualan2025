@@ -293,18 +293,18 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
 
     # Data waktu iterasi disesuaikan persis dengan hasil Colab terbaru Anda
     df_iter = pd.DataFrame([
-        {'Pengujian': '1', 'Waktu Apriori (detik)': 0.017478, 'Waktu FP-Growth (detik)': 0.113198, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': '2', 'Waktu Apriori (detik)': 0.016508, 'Waktu FP-Growth (detik)': 0.096814, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': '3', 'Waktu Apriori (detik)': 0.014475, 'Waktu FP-Growth (detik)': 0.094650, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': '4', 'Waktu Apriori (detik)': 0.014483, 'Waktu FP-Growth (detik)': 0.094400, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': '5', 'Waktu Apriori (detik)': 0.014883, 'Waktu FP-Growth (detik)': 0.093741, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0}
+        {'Pengujian': '1', 'Waktu Apriori (detik)': 0.0175, 'Waktu FP-Growth (detik)': 0.1132, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': '2', 'Waktu Apriori (detik)': 0.0165, 'Waktu FP-Growth (detik)': 0.0968, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': '3', 'Waktu Apriori (detik)': 0.0145, 'Waktu FP-Growth (detik)': 0.0947, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': '4', 'Waktu Apriori (detik)': 0.0145, 'Waktu FP-Growth (detik)': 0.0944, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': '5', 'Waktu Apriori (detik)': 0.0149, 'Waktu FP-Growth (detik)': 0.0937, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0}
     ])
 
     summary_df = pd.DataFrame([
         {
             'Pengujian': 'Rata-rata',
-            'Waktu Apriori (detik)': 0.015565,
-            'Waktu FP-Growth (detik)': 0.098561,
+            'Waktu Apriori (detik)': 0.01558,
+            'Waktu FP-Growth (detik)': 0.09856,
             'Frequent Itemsets Apriori': 126.0,
             'Frequent Itemsets FP-Growth': 126.0,
             'Association Rules Apriori': 86.0,
@@ -312,8 +312,8 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
         },
         {
             'Pengujian': 'Standar Deviasi',
-            'Waktu Apriori (detik)': 0.001358,
-            'Waktu FP-Growth (detik)': 0.008263,
+            'Waktu Apriori (detik)': 0.00135,
+            'Waktu FP-Growth (detik)': 0.00827,
             'Frequent Itemsets Apriori': float('nan'),
             'Frequent Itemsets FP-Growth': float('nan'),
             'Association Rules Apriori': float('nan'),
