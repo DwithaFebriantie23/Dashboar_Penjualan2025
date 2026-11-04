@@ -22,8 +22,8 @@ st.set_page_config(
 @st.cache_data
 def load_and_process_data():
     file_path = "Penjualan2025.xlsx"
-    # Pastikan pembacaan sheet dan header disamakan dengan Colab Anda
-    df_raw = pd.read_excel(file_path, sheet_name="Rekap 2025", header=1)
+    # Pembacaan sheet dan header disesuaikan dengan Colab (header=1)
+    df_raw = pd.read_excel(file_path, header=1)
     
     # 1. Data Cleaning dasar (Buang baris kosong pada ITEM & ID TRANSAKSI)
     df_clean = df_raw.dropna(subset=['ITEM', 'ID TRANSAKSI']).copy()
@@ -36,30 +36,30 @@ def load_and_process_data():
     
     # 3. Koreksi Typo Ukuran
     df_clean['ITEM'] = df_clean['ITEM'].replace({
-        '100100X': '100X100X'
+        '100100X': '100X100X',
+        '5050X3X125': '50X50X3X125'
     }, regex=True)
     
-    # --- STANDARISASI NAMA CUSTOMER ---
+    # 4. Standarisasi Nama Customer
     if 'CUSTOMER' in df_clean.columns:
         df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
         df_clean['CUSTOMER'] = df_clean['CUSTOMER'].replace({
-            'BP. ACUY': 'BP ACUY',
+            'BP. ACUY': 'Bp Acuy',
             'Bp. Acuy': 'Bp Acuy',
-            'BPACUY': 'Bp Acuy'
+            'BPACUY': 'Bp Acuy',
+            'BP ACUY': 'Bp Acuy'
         }, regex=True)
-        
-        # Opsional: Jika ingin menyeragamkan semuanya jadi huruf kapital atau Title Case
-        # df_clean['CUSTOMER'] = df_clean['CUSTOMER'].str.title()
     
     # 5. Kalkulasi Otomatis Nilai Total 0
-    df_clean['QTY'] = pd.to_numeric(df_clean['QTY'], errors='coerce').fillna(0)
-    df_clean['HARGA'] = pd.to_numeric(df_clean['HARGA'], errors='coerce').fillna(0)
-    df_clean['TOTAL'] = pd.to_numeric(df_clean['TOTAL'], errors='coerce').fillna(0)
-    
-    mask_zero = df_clean['TOTAL'] == 0
-    df_clean.loc[mask_zero & (df_clean['HARGA'] > 0), 'TOTAL'] = (
-        df_clean['QTY'] * df_clean['HARGA']
-    )
+    if 'QTY' in df_clean.columns and 'HARGA' in df_clean.columns and 'TOTAL' in df_clean.columns:
+        df_clean['QTY'] = pd.to_numeric(df_clean['QTY'], errors='coerce').fillna(0)
+        df_clean['HARGA'] = pd.to_numeric(df_clean['HARGA'], errors='coerce').fillna(0)
+        df_clean['TOTAL'] = pd.to_numeric(df_clean['TOTAL'], errors='coerce').fillna(0)
+        
+        mask_zero = df_clean['TOTAL'] == 0
+        df_clean.loc[mask_zero & (df_clean['HARGA'] > 0), 'TOTAL'] = (
+            df_clean['QTY'] * df_clean['HARGA']
+        )
     
     # Ekstraksi Tanggal & Bulan Kronologis
     if 'TANGGAL' in df_clean.columns:
@@ -70,7 +70,7 @@ def load_and_process_data():
         df_clean['MONTH_NUM'] = 1
         df_clean['BULAN'] = 'January 2025'
         
-    # 6. Fungsi Pelabelan Hierarki Rumpun (Sama persis dengan Colab)
+    # 6. Fungsi Pelabelan Hierarki Rumpun
     def get_prefix_sort_key(prefix_str):
         if 'kraft' in prefix_str.lower():
             return (999, 999, 999)
@@ -195,7 +195,7 @@ if menu_pilihan == "🏠 Home / Beranda":
     st.markdown("""
     * **Metodologi:** Knowledge Discovery in Databases (KDD)
     * **Dataset:** Rekapitulasi Penjualan Tahun 2025 (`Penjualan2025.xlsx`)
-    * **Preprocessing:** Pembersihan data kosong, standarisasi nama pelanggan, koreksi typo ukuran item, standarisasi huruf besar/kecil (*case insensitive*), 5 kali Pengujian Komparatif Apriori & FP-Growth, serta Pelabelan Hierarki Rumpun Dimensi ($R01-01, R07-20, \dots$).
+    * **Preprocessing:** Pembersihan data kosong, standarisasi nama pelanggan (`Bp Acuy`), koreksi typo ukuran item (`5050X3X125` & `100100X`), kalkulasi otomatis total 0, 5 kali Pengujian Komparatif Apriori & FP-Growth, serta Pelabelan Hierarki Rumpun Dimensi ($R01-01, R07-20, \dots$).
     """)
         
     st.markdown("---")
@@ -288,26 +288,23 @@ elif menu_pilihan == "📈 Hasil Analisis Data Mining":
 # =========================================================
 elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
     st.title("⚖️ Hasil Pengujian 5 Iterasi Komparatif")
-    st.markdown("Berikut adalah tabel rincian hasil pengujian komparatif 5 iterasi berdasarkan eksperimen Google Colab.")
+    st.markdown("Berikut adalah tabel rincian hasil pengujian komparatif 5 iterasi berdasarkan eksperimen Google Colab terbaru.")
     st.markdown("---")
 
-    min_supp = st.session_state.min_supp
-    min_conf = st.session_state.min_conf
-
-    # Data waktu iterasi disesuaikan dengan hasil Colab terbaru Anda
+    # Data waktu iterasi disesuaikan persis dengan hasil Colab terbaru Anda
     df_iter = pd.DataFrame([
-        {'Pengujian': 1, 'Waktu Apriori (detik)': 0.017728, 'Waktu FP-Growth (detik)': 0.117712, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': 2, 'Waktu Apriori (detik)': 0.018514, 'Waktu FP-Growth (detik)': 0.175241, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': 3, 'Waktu Apriori (detik)': 0.019864, 'Waktu FP-Growth (detik)': 0.147157, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': 4, 'Waktu Apriori (detik)': 0.015161, 'Waktu FP-Growth (detik)': 0.094222, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
-        {'Pengujian': 5, 'Waktu Apriori (detik)': 0.011560, 'Waktu FP-Growth (detik)': 0.107394, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0}
+        {'Pengujian': '1', 'Waktu Apriori (detik)': 0.017478, 'Waktu FP-Growth (detik)': 0.113198, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': '2', 'Waktu Apriori (detik)': 0.016508, 'Waktu FP-Growth (detik)': 0.096814, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': '3', 'Waktu Apriori (detik)': 0.014475, 'Waktu FP-Growth (detik)': 0.094650, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': '4', 'Waktu Apriori (detik)': 0.014483, 'Waktu FP-Growth (detik)': 0.094400, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0},
+        {'Pengujian': '5', 'Waktu Apriori (detik)': 0.014883, 'Waktu FP-Growth (detik)': 0.093741, 'Frequent Itemsets Apriori': 126.0, 'Frequent Itemsets FP-Growth': 126.0, 'Association Rules Apriori': 86.0, 'Association Rules FP-Growth': 86.0}
     ])
 
     summary_df = pd.DataFrame([
         {
             'Pengujian': 'Rata-rata',
-            'Waktu Apriori (detik)': 0.016565,
-            'Waktu FP-Growth (detik)': 0.128345,
+            'Waktu Apriori (detik)': 0.015565,
+            'Waktu FP-Growth (detik)': 0.098561,
             'Frequent Itemsets Apriori': 126.0,
             'Frequent Itemsets FP-Growth': 126.0,
             'Association Rules Apriori': 86.0,
@@ -315,8 +312,8 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
         },
         {
             'Pengujian': 'Standar Deviasi',
-            'Waktu Apriori (detik)': 0.003281,
-            'Waktu FP-Growth (detik)': 0.032671,
+            'Waktu Apriori (detik)': 0.001358,
+            'Waktu FP-Growth (detik)': 0.008263,
             'Frequent Itemsets Apriori': float('nan'),
             'Frequent Itemsets FP-Growth': float('nan'),
             'Association Rules Apriori': float('nan'),
@@ -341,12 +338,12 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
     col_sum1, col_sum2 = st.columns(2)
     with col_sum1:
         st.markdown("**APRIORI**")
-        st.write(f"Jumlah Frequent Itemsets : {int(df_tabel_komparasi.loc[0, 'Frequent Itemsets Apriori'])}")
-        st.write(f"Jumlah Association Rules : {int(df_tabel_komparasi.loc[0, 'Association Rules Apriori'])}")
+        st.write(f"Jumlah Frequent Itemsets : 126")
+        st.write(f"Jumlah Association Rules : 86")
     with col_sum2:
         st.markdown("**FP-GROWTH**")
-        st.write(f"Jumlah Frequent Itemsets : {int(df_tabel_komparasi.loc[0, 'Frequent Itemsets FP-Growth'])}")
-        st.write(f"Jumlah Association Rules : {int(df_tabel_komparasi.loc[0, 'Association Rules FP-Growth'])}")
+        st.write(f"Jumlah Frequent Itemsets : 126")
+        st.write(f"Jumlah Association Rules : 86")
 
     st.markdown("---")
 
@@ -363,7 +360,7 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
 
         ax.set_ylabel('Waktu Eksekusi (Detik)', fontweight='bold')
         ax.set_xticks(x)
-        ax.set_xticklabels([f"Pengujian {i}" for i in df_iter['Pengujian']], rotation=15, fontsize=8)
+        ax.set_xticklabels([f"Iterasi {i}" for i in df_iter['Pengujian']], rotation=15, fontsize=8)
         ax.legend()
         ax.grid(axis='y', linestyle='--', alpha=0.7)
 
@@ -379,13 +376,14 @@ elif menu_pilihan == "⚖️ Pengujian 5 Iterasi":
 
     with col_g2:
         st.subheader("📈 Scatter Plot Support vs Confidence")
-        fi_ap = apriori(basket_sets, min_support=min_supp, use_colnames=True)
-        r_ap = association_rules(fi_ap, metric="confidence", min_threshold=min_conf) if not fi_ap.empty else pd.DataFrame()
+        fi_ap = apriori(basket_sets, min_support=st.session_state.min_supp, use_colnames=True)
+        r_ap = association_rules(fi_ap, metric="confidence", min_threshold=st.session_state.min_conf) if not fi_ap.empty else pd.DataFrame()
         
         if not r_ap.empty:
             fig2, ax2 = plt.subplots(figsize=(6, 4))
             sc = ax2.scatter(r_ap['support'], r_ap['confidence'], c=r_ap['lift'], cmap='viridis', s=60, alpha=0.85)
-            plt.colorbar(sc, label='Lift Ratio')
+            cbar = plt.colorbar(sc, ax=ax2)
+            cbar.set_label('Lift Ratio')
             ax2.set_xlabel('Support')
             ax2.set_ylabel('Confidence')
             ax2.grid(True, linestyle='--', alpha=0.5)
