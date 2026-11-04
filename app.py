@@ -30,7 +30,12 @@ def load_and_process_data():
     df_clean['ITEM'] = df_clean['ITEM'].astype(str).str.strip()
     
     # --- 1. KOREKSI KESALAHAN PENULISAN (TYPO) & CASE INSENSITIVITY PADA UKURAN ITEM ---
+    # Mengubah seluruh string menjadi huruf kapital agar 'x' kecil menjadi 'X' besar
     df_clean['ITEM'] = df_clean['ITEM'].str.upper()
+    
+    # Menghapus spasi internal di dalam string ukuran (misal: "50 X 50" -> "50X50")
+    df_clean['ITEM'] = df_clean['ITEM'].str.replace(r'\s+', '', regex=True)
+    
     df_clean['ITEM'] = df_clean['ITEM'].replace({
         '100100X': '100X100X'
     }, regex=True)
@@ -39,7 +44,6 @@ def load_and_process_data():
     if 'CUSTOMER' in df_clean.columns:
         df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
         df_clean['CUSTOMER'] = df_clean['CUSTOMER'].replace({
-            'BP. ACUY': 'BP ACUY',
             'BP. ACUY': 'BP ACUY'
         }, regex=True)
     
