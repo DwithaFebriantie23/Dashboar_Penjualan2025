@@ -29,17 +29,19 @@ def load_and_process_data():
     df_clean['ID TRANSAKSI'] = df_clean['ID TRANSAKSI'].astype(str).str.strip()
     df_clean['ITEM'] = df_clean['ITEM'].astype(str).str.strip()
     
-    # --- 1. KOREKSI KESALAHAN PENULISAN (TYPO) UKURAN ITEM ---
+    # --- 1. KOREKSI KESALAHAN PENULISAN (TYPO) & CASE INSENSITIVITY PADA UKURAN ITEM ---
+    df_clean['ITEM'] = df_clean['ITEM'].str.upper()
     df_clean['ITEM'] = df_clean['ITEM'].replace({
-        '100100x': '100x100x'
+        '100100X': '100X100X'
     }, regex=True)
     
     # --- 2. STANDARISASI NAMA CUSTOMER ---
-    df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
-    df_clean['CUSTOMER'] = df_clean['CUSTOMER'].replace({
-        'BP. Acuy': 'Bp Acuy',
-        'Bp. Acuy': 'Bp Acuy'
-    }, regex=True)
+    if 'CUSTOMER' in df_clean.columns:
+        df_clean['CUSTOMER'] = df_clean['CUSTOMER'].astype(str).str.strip()
+        df_clean['CUSTOMER'] = df_clean['CUSTOMER'].replace({
+            'BP. ACUY': 'BP ACUY',
+            'BP. ACUY': 'BP ACUY'
+        }, regex=True)
     
     # --- 3. PEMBERSIHAN & KALKULASI OTOMATIS NILAI TOTAL 0 ---
     df_clean['QTY'] = pd.to_numeric(df_clean['QTY'], errors='coerce').fillna(0)
@@ -52,10 +54,14 @@ def load_and_process_data():
     )
     
     # Ekstraksi Tanggal & Bulan Kronologis (Januari - Desember)
-    df_clean['TANGGAL'] = pd.to_datetime(df_clean['TANGGAL'], errors='coerce')
-    df_clean['MONTH_NUM'] = df_clean['TANGGAL'].dt.month
-    df_clean['BULAN'] = df_clean['TANGGAL'].dt.strftime('%B %Y')
-    
+    if 'TANGGAL' in df_clean.columns:
+        df_clean['TANGGAL'] = pd.to_datetime(df_clean['TANGGAL'], errors='coerce')
+        df_clean['MONTH_NUM'] = df_clean['TANGGAL'].dt.month
+        df_clean['BULAN'] = df_clean['TANGGAL'].dt.strftime('%B %Y')
+    else:
+        df_clean['MONTH_NUM'] = 1
+        df_clean['BULAN'] = 'January 2025'
+        
     # --- 4. PELABELAN HIERARKI RUMPUN DIMENSI (R01-01, R07-20, dst.) ---
     def get_prefix_sort_key(prefix_str):
         if 'kraft' in prefix_str.lower():
@@ -156,7 +162,7 @@ menu_pilihan = st.sidebar.radio(
 st.sidebar.markdown("---")
 st.sidebar.info("💡 **Tips:** Pilih menu di atas untuk berpindah halaman.")
 
-# Inisialisasi Session State Parameter Default (Diset ke Min Support 0.005 & Confidence 0.1)
+# Inisialisasi Session State Parameter Default
 if "min_supp" not in st.session_state:
     st.session_state.min_supp = 0.005
 if "min_conf" not in st.session_state:
@@ -181,7 +187,7 @@ if menu_pilihan == "🏠 Home / Beranda":
     st.markdown("""
     * **Metodologi:** Knowledge Discovery in Databases (KDD)
     * **Dataset:** Rekapitulasi Penjualan Tahun 2025 (`Penjualan2025.xlsx`)
-    * **Preprocessing:** Pembersihan data kosong, standarisasi nama pelanggan, koreksi typo ukuran item, 5 kali Pengujian Komparatif Apriori & FP-Growth, serta Pelabelan Hierarki Rumpun Dimensi ($R01-01, R07-20, \dots$).
+    * **Preprocessing:** Pembersihan data kosong, standarisasi nama pelanggan, koreksi typo ukuran item, standarisasi huruf besar/kecil (*case insensitive*), 5 kali Pengujian Komparatif Apriori & FP-Growth, serta Pelabelan Hierarki Rumpun Dimensi ($R01-01, R07-20, \dots$).
     """)
         
     st.markdown("---")
