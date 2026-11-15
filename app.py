@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 BASE_DIR = Path(__file__).parent
-FILE_EXCEL = BASE_DIR / "Penjualan2025(4).xlsx"
+FILE_EXCEL = BASE_DIR / "Penjualan2025.xlsx"
 
 
 # =========================================================
