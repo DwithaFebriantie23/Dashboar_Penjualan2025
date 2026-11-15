@@ -2,267 +2,690 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
+
 
 # =========================================================
 # 1. KONFIGURASI DASHBOARD
 # =========================================================
 
 st.set_page_config(
-    page_title="Dashboard Analisis Apriori - PT CKL",
+    page_title="Dashboard Penjualan PT. Cakrawala Kemasindo Lestari",
     page_icon="📊",
     layout="wide"
 )
 
-NAMA_PERUSAHAAN = "PT Cakrawala Kemasindo Lestari"
+BASE_DIR = Path(__file__).parent
+FILE_EXCEL = BASE_DIR / "Penjualan2025(4).xlsx"
+
 
 # =========================================================
-# 2. DATA HASIL PENELITIAN DARI GOOGLE COLAB
-# Seluruh data di bawah merupakan hasil penelitian,
-# bukan hasil pengolahan ulang dataset Excel.
+# 2. MEMBACA DAN MEMBERSIHKAN DATA EXCEL
+# =========================================================
+
+@st.cache_data
+def load_data():
+
+    df = pd.read_excel(
+        FILE_EXCEL,
+        sheet_name="Rekap 2025",
+        header=1
+    )
+
+    # Menghapus data yang tidak memiliki ID transaksi atau ITEM
+    df = df.dropna(
+        subset=["ID TRANSAKSI", "ITEM"]
+    ).copy()
+
+    # Mengubah format ID transaksi menjadi teks
+    def normalisasi_id(value):
+        if isinstance(value, pd.Timestamp):
+            return value.strftime("%Y-%m-%d")
+        return str(value).strip()
+
+    df["ID TRANSAKSI"] = (
+        df["ID TRANSAKSI"].apply(normalisasi_id)
+    )
+
+    # Mempertahankan nama ITEM asli
+    df["ITEM"] = (
+        df["ITEM"].astype(str).str.strip()
+    )
+
+    # Membersihkan nama pelanggan
+    df["CUSTOMER"] = (
+        df["CUSTOMER"].fillna("Tidak Diketahui")
+        .astype(str)
+        .str.strip()
+    )
+
+    # Mengubah tanggal menjadi format datetime
+    df["TANGGAL"] = pd.to_datetime(
+        df["TANGGAL"],
+        errors="coerce"
+    )
+
+    # Mengubah kolom numerik
+    for kolom in ["QTY", "HARGA", "TOTAL"]:
+        df[kolom] = pd.to_numeric(
+            df[kolom],
+            errors="coerce"
+        )
+
+    # Mengeluarkan baris dengan TOTAL = 0
+    df = df[df["TOTAL"] != 0].copy()
+
+    # Menghapus data yang tidak memiliki tanggal
+    # agar dapat digunakan dalam grafik bulanan
+    df["BULAN"] = df["TANGGAL"].dt.to_period("M")
+
+    return df
+
+
+# =========================================================
+# 3. MEMUAT DATA
+# =========================================================
+
+st.sidebar.title("📊 Dashboard PT. CKL")
+
+try:
+    df = load_data()
+
+except FileNotFoundError:
+    st.error(
+        "File Penjualan2025(4).xlsx tidak ditemukan. "
+        "Pastikan file Excel berada satu folder dengan app.py."
+    )
+    st.stop()
+
+except Exception as e:
+    st.error(f"Terjadi kesalahan saat membaca Excel: {e}")
+    st.stop()
+
+
+# =========================================================
+# 4. DATA HASIL PENELITIAN APRIORI DARI COLAB
 # =========================================================
 
 DATA_PENELITIAN = {
     "data_awal": 1889,
     "data_dikeluarkan": 6,
     "data_bersih": 1883,
-    "jumlah_transaksi": 1146,
-    "jumlah_item": 422,
-    "jumlah_kolom": 7,
-    "ukuran_matriks": "1.146 x 422",
-    "rata_item": 1.63,
-    "std_item": 1.21,
-    "min_item": 1,
-    "median_item": 1,
-    "q1_item": 1,
-    "q3_item": 2,
-    "max_item": 12
+    "transaksi": 1146,
+    "produk": 422,
+    "matriks_basket": "1.146 × 422"
 }
 
-PARAMETER_TERPILIH = {
-    "minimum_support": 0.010,
-    "minimum_confidence": 0.20,
-    "frequent_itemsets": 45,
-    "aturan_asosiasi": 20,
-    "rata_support": 0.012129,
-    "rata_confidence": 0.855423,
-    "rata_lift": 64.262390
-}
 
-# Hasil lima konfigurasi pengujian dari Colab
-DATA_PENGUJIAN = pd.DataFrame([
-    {
-        "Pengujian": "Pengujian 1",
-        "Minimum Support": 0.005,
-        "Minimum Confidence": 0.10,
-        "Frequent Itemsets": 125,
-        "Aturan Asosiasi": 86
-    },
-    {
-        "Pengujian": "Pengujian 2",
-        "Minimum Support": 0.010,
-        "Minimum Confidence": 0.20,
-        "Frequent Itemsets": 45,
-        "Aturan Asosiasi": 20
-    },
-    {
-        "Pengujian": "Pengujian 3",
-        "Minimum Support": 0.015,
-        "Minimum Confidence": 0.30,
-        "Frequent Itemsets": 19,
-        "Aturan Asosiasi": 2
-    },
-    {
-        "Pengujian": "Pengujian 4",
-        "Minimum Support": 0.020,
-        "Minimum Confidence": 0.40,
-        "Frequent Itemsets": 11,
-        "Aturan Asosiasi": 0
-    },
-    {
-        "Pengujian": "Pengujian 5",
-        "Minimum Support": 0.025,
-        "Minimum Confidence": 0.50,
-        "Frequent Itemsets": 6,
-        "Aturan Asosiasi": 0
-    }
-])
+DATA_PENGUJIAN = pd.DataFrame({
+    "Pengujian": [
+        "Pengujian 1",
+        "Pengujian 2",
+        "Pengujian 3",
+        "Pengujian 4",
+        "Pengujian 5"
+    ],
+    "Min Support": [
+        0.005, 0.010, 0.015, 0.020, 0.025
+    ],
+    "Min Confidence": [
+        0.10, 0.20, 0.30, 0.40, 0.50
+    ],
+    "Frequent Itemsets": [
+        125, 45, 19, 11, 6
+    ],
+    "Aturan Asosiasi": [
+        86, 20, 2, 0, 0
+    ]
+})
 
-# Lima kandidat paket penjualan hasil penelitian
-DATA_KANDIDAT = pd.DataFrame([
-    {
-        "Kandidat": "Kandidat 1",
-        "Kombinasi Produk": (
-            "100x3x780 + 100x3x1100 + 100x3x1130"
-        ),
-        "Support": 0.012216,
-        "Confidence": "100%",
-        "Lift": 81.857143,
-        "Jumlah Transaksi": 14,
-        "Jumlah Pelanggan": 2
-    },
-    {
-        "Kandidat": "Kandidat 2",
-        "Kombinasi Produk": (
-            "80x80x5x520 + 80x80x5x800"
-        ),
-        "Support": 0.010471,
-        "Confidence": "92,31%",
-        "Lift": 81.372781,
-        "Jumlah Transaksi": 12,
-        "Jumlah Pelanggan": 3
-    },
-    {
-        "Kandidat": "Kandidat 3",
-        "Kombinasi Produk": (
-            "100x100x8x200 + 100x100x8x250"
-        ),
-        "Support": 0.015707,
-        "Confidence": "54,55% - 78,26%",
-        "Lift": 27.177866,
-        "Jumlah Transaksi": 18,
-        "Jumlah Pelanggan": 1
-    },
-    {
-        "Kandidat": "Kandidat 4",
-        "Kombinasi Produk": (
-            "50x50x3x125 + 50x50x3x240"
-        ),
-        "Support": 0.010471,
-        "Confidence": "44,44% - 63,16%",
-        "Lift": 26.807018,
-        "Jumlah Transaksi": 12,
-        "Jumlah Pelanggan": 2
-    },
-    {
-        "Kandidat": "Kandidat 5",
-        "Kombinasi Produk": (
-            "100x100x5x1150 + 100x100x8x250"
-        ),
-        "Support": 0.011344,
-        "Confidence": "39,39% - 46,43%",
-        "Lift": 16.123377,
-        "Jumlah Transaksi": 13,
-        "Jumlah Pelanggan": 1
-    }
-])
+
+DATA_KANDIDAT = pd.DataFrame({
+    "Kandidat Paket": [
+        "100x3x780 + 100x3x1100 + 100x3x1130",
+        "80x80x5x520 + 80x80x5x800",
+        "100x100x8x200 + 100x100x8x250",
+        "50x50x3x125 + 50x50x3x240",
+        "100x100x5x1150 + 100x100x8x250"
+    ],
+    "Support": [
+        0.012216,
+        0.010471,
+        0.015707,
+        0.010471,
+        0.011344
+    ],
+    "Confidence": [
+        "100%",
+        "92,31%",
+        "54,55%–78,26%",
+        "44,44%–63,16%",
+        "39,39%–46,43%"
+    ],
+    "Lift": [
+        81.857143,
+        81.372781,
+        27.177866,
+        26.807018,
+        16.123377
+    ],
+    "Jumlah Transaksi": [
+        14, 12, 18, 12, 13
+    ],
+    "Jumlah Pelanggan": [
+        2, 3, 1, 2, 1
+    ]
+})
 
 
 # =========================================================
-# 3. FUNGSI FORMAT ANGKA
+# 5. FUNGSI FORMAT ANGKA
 # =========================================================
 
-def format_ribuan(nilai):
-    return f"{nilai:,}".replace(",", ".")
+def rupiah(nilai):
+    return "Rp " + f"{nilai:,.0f}".replace(",", ".")
 
 
-def format_persen(nilai):
-    return f"{nilai:.2%}".replace(".", ",")
-
-
-def format_desimal(nilai):
-    return f"{nilai:.6f}".replace(".", ",")
+def angka(nilai):
+    return f"{nilai:,.0f}".replace(",", ".")
 
 
 # =========================================================
-# 4. SIDEBAR DAN NAVIGASI
+# 6. NAVIGASI SIDEBAR
 # =========================================================
-
-st.sidebar.title("📊 Dashboard PT CKL")
-st.sidebar.caption("Analisis Pola Pembelian Produk")
 
 menu = st.sidebar.radio(
     "Pilih Halaman",
     [
-        "🏠 Beranda",
-        "📁 Karakteristik Data",
-        "📈 Hasil Apriori",
-        "📦 Kandidat Paket Penjualan",
-        "⚙️ Pengujian Parameter",
-        "📊 Grafik dan Analisis"
+        "Beranda",
+        "Karakteristik Data",
+        "Analisis Penjualan",
+        "Hasil Apriori",
+        "Kandidat Paket Penjualan",
+        "Pengujian Parameter"
     ]
 )
 
 st.sidebar.divider()
 
-st.sidebar.info(
-    """
-    **Informasi Penelitian**
+st.sidebar.caption(
+    "Sistem Informasi | Data Science"
+)
 
-    - Metode: KDD
-    - Algoritma: Apriori
-    - Dataset: Penjualan Tahun 2025
-    - Objek: PT CKL
-
-    Dashboard menampilkan hasil pengolahan
-    yang telah dilakukan melalui Google Colab.
-    """
+st.sidebar.caption(
+    "Studi Kasus: PT. Cakrawala Kemasindo Lestari"
 )
 
 
 # =========================================================
-# 5. HALAMAN BERANDA
+# 7. HALAMAN BERANDA
 # =========================================================
 
-if menu == "🏠 Beranda":
+if menu == "Beranda":
 
-    st.title("Dashboard Analisis Pola Pembelian")
-    st.subheader(NAMA_PERUSAHAAN)
+    st.title("📊 Dashboard Penjualan PT. Cakrawala Kemasindo Lestari")
 
     st.write(
-        """
-        Dashboard ini menyajikan hasil penelitian analisis
-        pola pembelian produk menggunakan algoritma Apriori
-        berdasarkan data transaksi penjualan PT CKL tahun 2025.
-
-        Hasil analisis digunakan untuk mengidentifikasi
-        frequent itemsets, aturan asosiasi, serta kandidat
-        paket penjualan berdasarkan pola pembelian pelanggan.
-        """
+        "Dashboard ini menyajikan informasi penjualan "
+        "PT Cakrawala Kemasindo Lestari tahun 2025 "
+        "serta hasil penelitian menggunakan algoritma Apriori."
     )
 
     st.divider()
 
-    st.subheader("Ringkasan Dataset")
+    total_penjualan = df["TOTAL"].sum()
+    total_transaksi = df["ID TRANSAKSI"].nunique()
+    total_pelanggan = df["CUSTOMER"].nunique()
+    total_produk = df["ITEM"].nunique()
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric(
+        "Total Penjualan",
+        rupiah(total_penjualan)
+    )
+
+    col2.metric(
+        "Jumlah Transaksi",
+        angka(total_transaksi)
+    )
+
+    col3.metric(
+        "Jumlah Pelanggan",
+        angka(total_pelanggan)
+    )
+
+    col4.metric(
+        "Jenis Produk",
+        angka(total_produk)
+    )
+
+    st.divider()
+
+    st.subheader("Ringkasan Dashboard")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.info(
+            """
+            **Analisis Penjualan**
+
+            Menampilkan informasi transaksi penjualan
+            berdasarkan periode, pelanggan, dan produk.
+            """
+        )
+
+    with col2:
+        st.success(
+            """
+            **Hasil Algoritma Apriori**
+
+            Menampilkan hasil pengujian parameter,
+            aturan asosiasi, dan kandidat paket penjualan.
+            """
+        )
+
+    st.subheader("Grafik Penjualan Bulanan")
+
+    data_bulan = (
+        df.dropna(subset=["TANGGAL"])
+        .groupby("BULAN")["TOTAL"]
+        .sum()
+        .reset_index()
+    )
+
+    data_bulan["BULAN"] = (
+        data_bulan["BULAN"].astype(str)
+    )
+
+    if not data_bulan.empty:
+
+        fig, ax = plt.subplots(figsize=(12, 4))
+
+        ax.bar(
+            data_bulan["BULAN"],
+            data_bulan["TOTAL"]
+        )
+
+        ax.set_xlabel("Bulan")
+        ax.set_ylabel("Total Penjualan (Rp)")
+        ax.set_title("Total Penjualan PT CKL Tahun 2025")
+
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+
+        st.pyplot(fig)
+        plt.close(fig)
+
+
+# =========================================================
+# 8. HALAMAN KARAKTERISTIK DATA
+# =========================================================
+
+elif menu == "Karakteristik Data":
+
+    st.title("📁 Karakteristik Data Penjualan")
+
+    st.write(
+        "Halaman ini menampilkan karakteristik data "
+        "penjualan yang dibaca dari file Excel."
+    )
 
     col1, col2, col3 = st.columns(3)
 
     col1.metric(
-        "Data Bersih",
-        format_ribuan(DATA_PENELITIAN["data_bersih"])
+        "Jumlah Baris Data",
+        angka(len(df))
     )
 
     col2.metric(
-        "Transaksi Unik",
-        format_ribuan(DATA_PENELITIAN["jumlah_transaksi"])
+        "Jumlah Transaksi",
+        angka(df["ID TRANSAKSI"].nunique())
     )
 
     col3.metric(
-        "UK Asli",
-        format_ribuan(DATA_PENELITIAN["jumlah_item"])
+        "Jumlah Jenis Produk",
+        angka(df["ITEM"].nunique())
     )
 
     st.divider()
 
-    st.subheader("Ringkasan Hasil Algoritma Apriori")
+    st.subheader("Informasi Kolom Dataset")
+
+    informasi = pd.DataFrame({
+        "Nama Kolom": df.columns,
+        "Jumlah Data Terisi": [
+            df[kolom].notna().sum()
+            for kolom in df.columns
+        ],
+        "Tipe Data": [
+            str(df[kolom].dtype)
+            for kolom in df.columns
+        ]
+    })
+
+    st.dataframe(
+        informasi,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.subheader("Data Penjualan")
+
+    st.dataframe(
+        df[
+            [
+                "TANGGAL",
+                "CUSTOMER",
+                "ID TRANSAKSI",
+                "ITEM",
+                "QTY",
+                "HARGA",
+                "TOTAL"
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.caption(
+        "Data ditampilkan berdasarkan isi file Excel "
+        "setelah proses pembersihan."
+    )
+
+
+# =========================================================
+# 9. HALAMAN ANALISIS PENJUALAN
+# =========================================================
+
+elif menu == "Analisis Penjualan":
+
+    st.title("📈 Analisis Penjualan")
+
+    st.write(
+        "Gunakan filter berikut untuk melihat penjualan "
+        "berdasarkan bulan, pelanggan, dan produk."
+    )
+
+    # -------------------------
+    # FILTER DATA
+    # -------------------------
 
     col1, col2, col3 = st.columns(3)
 
+    with col1:
+
+        daftar_bulan = sorted(
+            df["BULAN"].dropna().astype(str).unique()
+        )
+
+        pilihan_bulan = st.multiselect(
+            "Pilih Bulan",
+            options=daftar_bulan,
+            default=daftar_bulan
+        )
+
+    with col2:
+
+        daftar_customer = sorted(
+            df["CUSTOMER"].dropna().unique().tolist()
+        )
+
+        pilihan_customer = st.multiselect(
+            "Pilih Pelanggan",
+            options=daftar_customer
+        )
+
+    with col3:
+
+        daftar_item = sorted(
+            df["ITEM"].dropna().unique().tolist()
+        )
+
+        pilihan_item = st.multiselect(
+            "Pilih UK Produk",
+            options=daftar_item
+        )
+
+    # -------------------------
+    # PROSES FILTER
+    # -------------------------
+
+    data_filter = df.copy()
+
+    if pilihan_bulan:
+        data_filter = data_filter[
+            data_filter["BULAN"].astype(str).isin(
+                pilihan_bulan
+            )
+        ]
+    else:
+        data_filter = data_filter.iloc[0:0]
+
+    if pilihan_customer:
+        data_filter = data_filter[
+            data_filter["CUSTOMER"].isin(
+                pilihan_customer
+            )
+        ]
+
+    if pilihan_item:
+        data_filter = data_filter[
+            data_filter["ITEM"].isin(
+                pilihan_item
+            )
+        ]
+
+    st.divider()
+
+    # -------------------------
+    # RINGKASAN HASIL FILTER
+    # -------------------------
+
+    total_penjualan = data_filter["TOTAL"].sum()
+    total_transaksi = data_filter["ID TRANSAKSI"].nunique()
+    total_pelanggan = data_filter["CUSTOMER"].nunique()
+    total_qty = data_filter["QTY"].sum()
+
+    col1, col2, col3, col4 = st.columns(4)
+
     col1.metric(
-        "Frequent Itemsets",
-        PARAMETER_TERPILIH["frequent_itemsets"]
+        "Total Penjualan",
+        rupiah(total_penjualan)
     )
 
     col2.metric(
-        "Aturan Asosiasi",
-        PARAMETER_TERPILIH["aturan_asosiasi"]
+        "Jumlah Transaksi",
+        angka(total_transaksi)
     )
 
     col3.metric(
-        "Kandidat Paket",
-        len(DATA_KANDIDAT)
+        "Jumlah Pelanggan",
+        angka(total_pelanggan)
+    )
+
+    col4.metric(
+        "Total QTY",
+        angka(total_qty)
     )
 
     st.divider()
+
+    # -------------------------
+    # GRAFIK PENJUALAN BULANAN
+    # -------------------------
+
+    st.subheader("Total Penjualan per Bulan")
+
+    penjualan_bulanan = (
+        data_filter.dropna(subset=["TANGGAL"])
+        .groupby("BULAN")["TOTAL"]
+        .sum()
+        .reset_index()
+    )
+
+    penjualan_bulanan["BULAN"] = (
+        penjualan_bulanan["BULAN"].astype(str)
+    )
+
+    if not penjualan_bulanan.empty:
+
+        fig, ax = plt.subplots(figsize=(12, 4))
+
+        ax.bar(
+            penjualan_bulanan["BULAN"],
+            penjualan_bulanan["TOTAL"]
+        )
+
+        ax.set_xlabel("Bulan")
+        ax.set_ylabel("Total Penjualan (Rp)")
+        ax.set_title("Penjualan Berdasarkan Bulan")
+
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+
+        st.pyplot(fig)
+        plt.close(fig)
+
+    else:
+        st.warning("Tidak ada data untuk ditampilkan.")
+
+    st.divider()
+
+    # -------------------------
+    # PENJUALAN BERDASARKAN PELANGGAN
+    # -------------------------
+
+    st.subheader("Total Penjualan Berdasarkan Pelanggan")
+
+    penjualan_customer = (
+        data_filter.groupby("CUSTOMER")["TOTAL"]
+        .sum()
+        .sort_values(ascending=False)
+        .reset_index()
+    )
+
+    if not penjualan_customer.empty:
+
+        fig, ax = plt.subplots(figsize=(12, 5))
+
+        ax.barh(
+            penjualan_customer["CUSTOMER"].iloc[::-1],
+            penjualan_customer["TOTAL"].iloc[::-1]
+        )
+
+        ax.set_xlabel("Total Penjualan (Rp)")
+        ax.set_ylabel("Nama Pelanggan")
+        ax.set_title("Penjualan Berdasarkan Pelanggan")
+
+        plt.tight_layout()
+
+        st.pyplot(fig)
+        plt.close(fig)
+
+        st.dataframe(
+            penjualan_customer,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    else:
+        st.info("Belum ada data pelanggan yang sesuai filter.")
+
+    st.divider()
+
+    # -------------------------
+    # PRODUK TERLARIS
+    # -------------------------
+
+    st.subheader("Produk Berdasarkan Total QTY")
+
+    produk_terlaris = (
+        data_filter.groupby("ITEM")["QTY"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+        .reset_index()
+    )
+
+    if not produk_terlaris.empty:
+
+        fig, ax = plt.subplots(figsize=(12, 5))
+
+        ax.barh(
+            produk_terlaris["ITEM"].iloc[::-1],
+            produk_terlaris["QTY"].iloc[::-1]
+        )
+
+        ax.set_xlabel("Total QTY")
+        ax.set_ylabel("UK Produk")
+        ax.set_title("10 Produk dengan QTY Tertinggi")
+
+        plt.tight_layout()
+
+        st.pyplot(fig)
+        plt.close(fig)
+
+        st.dataframe(
+            produk_terlaris,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    st.divider()
+
+    # -------------------------
+    # TABEL DETAIL DATA
+    # -------------------------
+
+    st.subheader("Detail Data Berdasarkan Filter")
+
+    st.write(
+        f"Jumlah baris data yang sesuai: {len(data_filter)}"
+    )
+
+    st.dataframe(
+        data_filter[
+            [
+                "TANGGAL",
+                "CUSTOMER",
+                "ID TRANSAKSI",
+                "ITEM",
+                "QTY",
+                "HARGA",
+                "TOTAL"
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # Tombol unduh hasil filter
+    csv = data_filter.to_csv(
+        index=False
+    ).encode("utf-8-sig")
+
+    st.download_button(
+        label="📥 Unduh Data Hasil Filter",
+        data=csv,
+        file_name="data_penjualan_hasil_filter.csv",
+        mime="text/csv"
+    )
+
+
+# =========================================================
+# 10. HALAMAN HASIL APRIORI
+# =========================================================
+
+elif menu == "Hasil Apriori":
+
+    st.title("🔍 Hasil Penelitian Algoritma Apriori")
+
+    st.write(
+        "Halaman ini menyajikan ringkasan hasil pengolahan "
+        "algoritma Apriori yang telah dilakukan di Google Colab."
+    )
 
     st.subheader("Parameter Terpilih")
 
@@ -278,244 +701,81 @@ if menu == "🏠 Beranda":
         "0,20"
     )
 
-    st.info(
-        """
-        Pengujian kedua dipilih karena menghasilkan
-        45 frequent itemsets dan 20 aturan asosiasi.
-        Hasil tersebut digunakan untuk analisis pola
-        pembelian dan penentuan kandidat paket penjualan.
-        """
-    )
-
-    st.caption(
-        "Sumber: Hasil pengolahan data penelitian menggunakan Google Colab, 2026."
-    )
-
-
-# =========================================================
-# 6. HALAMAN KARAKTERISTIK DATA
-# =========================================================
-
-elif menu == "📁 Karakteristik Data":
-
-    st.title("Karakteristik Data Penelitian")
-
-    st.write(
-        """
-        Halaman ini menampilkan ringkasan karakteristik
-        dataset setelah tahap preprocessing dan transformasi
-        data transaksi.
-        """
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Data Awal",
-        format_ribuan(DATA_PENELITIAN["data_awal"])
-    )
-
-    col2.metric(
-        "Data Dikeluarkan",
-        format_ribuan(DATA_PENELITIAN["data_dikeluarkan"])
-    )
-
-    col3.metric(
-        "Data Bersih",
-        format_ribuan(DATA_PENELITIAN["data_bersih"])
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Transaksi Unik",
-        format_ribuan(DATA_PENELITIAN["jumlah_transaksi"])
-    )
-
-    col2.metric(
-        "Jenis UK",
-        format_ribuan(DATA_PENELITIAN["jumlah_item"])
-    )
-
-    col3.metric(
-        "Atribut Dataset",
-        DATA_PENELITIAN["jumlah_kolom"]
-    )
-
     st.divider()
 
-    st.subheader("Ringkasan Preprocessing")
-
-    tabel_preprocessing = pd.DataFrame({
-        "Keterangan": [
-            "Jumlah data awal",
-            "Baris TOTAL = 0 yang dikeluarkan",
-            "Jumlah data setelah preprocessing",
-            "Jumlah transaksi unik",
-            "Jumlah UK asli",
-            "Nilai kosong setelah preprocessing",
-            "Data duplikat identik yang dipertahankan"
-        ],
-        "Hasil": [
-            "1.889 baris",
-            "6 baris",
-            "1.883 baris",
-            "1.146 transaksi",
-            "422 item",
-            "0",
-            "1 kejadian"
-        ]
-    })
-
-    st.dataframe(
-        tabel_preprocessing,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.divider()
-
-    st.subheader("Karakteristik Jumlah Item per Transaksi")
-
-    tabel_karakteristik = pd.DataFrame({
-        "Statistik": [
-            "Rata-rata",
-            "Standar deviasi",
-            "Minimum",
-            "Kuartil pertama (Q1)",
-            "Median (Q2)",
-            "Kuartil ketiga (Q3)",
-            "Maksimum"
-        ],
-        "Jumlah Jenis Item": [
-            "1,63",
-            "1,21",
-            "1",
-            "1",
-            "1",
-            "2",
-            "12"
-        ]
-    })
-
-    st.dataframe(
-        tabel_karakteristik,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.divider()
-
-    st.subheader("Hasil Transformasi Data")
-
-    st.metric(
-        "Ukuran Matriks Transaksi",
-        DATA_PENELITIAN["ukuran_matriks"]
-    )
-
-    st.write(
-        """
-        Matriks transaksi menggunakan representasi biner.
-        Nilai 1 menunjukkan bahwa UK terdapat dalam transaksi,
-        sedangkan nilai 0 menunjukkan bahwa UK tidak terdapat
-        dalam transaksi.
-        """
-    )
-
-
-# =========================================================
-# 7. HALAMAN HASIL APRIORI
-# =========================================================
-
-elif menu == "📈 Hasil Apriori":
-
-    st.title("Hasil Analisis Algoritma Apriori")
-
-    st.write(
-        """
-        Hasil berikut merupakan ringkasan pengujian kedua,
-        yaitu konfigurasi minimum support 0,010 dan
-        minimum confidence 0,20.
-        """
-    )
+    st.subheader("Hasil Pembentukan Pola")
 
     col1, col2 = st.columns(2)
 
     col1.metric(
         "Frequent Itemsets",
-        PARAMETER_TERPILIH["frequent_itemsets"]
+        "45"
     )
 
     col2.metric(
         "Aturan Asosiasi",
-        PARAMETER_TERPILIH["aturan_asosiasi"]
+        "20"
     )
 
     st.divider()
 
-    st.subheader("Ringkasan Evaluasi Aturan Asosiasi")
+    st.subheader("Rata-rata Nilai Aturan Asosiasi")
 
     col1, col2, col3 = st.columns(3)
 
     col1.metric(
-        "Rata-rata Support",
-        format_persen(PARAMETER_TERPILIH["rata_support"])
+        "Average Support",
+        "0,012129"
     )
 
     col2.metric(
-        "Rata-rata Confidence",
-        format_persen(PARAMETER_TERPILIH["rata_confidence"])
+        "Average Confidence",
+        "85,54%"
     )
 
     col3.metric(
-        "Rata-rata Lift",
-        format_desimal(PARAMETER_TERPILIH["rata_lift"])
+        "Average Lift",
+        "64,262390"
     )
 
     st.divider()
 
     st.subheader("Interpretasi Hasil")
 
-    st.markdown(
+    st.write(
         """
-        - **Support** menggambarkan proporsi transaksi yang
-          memuat kombinasi produk.
-        - **Confidence** menggambarkan tingkat kepercayaan
-          aturan asosiasi berdasarkan arah aturan.
-        - **Lift** menunjukkan kekuatan keterkaitan produk
-          dibandingkan dengan kemunculan secara independen.
+        Berdasarkan konfigurasi parameter terpilih, algoritma
+        Apriori menghasilkan 45 frequent itemsets dan 20 aturan
+        asosiasi.
+
+        Nilai lift seluruh aturan yang dihasilkan lebih dari 1.
+        Hal ini menunjukkan adanya asosiasi positif antara
+        produk-produk yang muncul dalam aturan tersebut.
+
+        Hasil ini kemudian digunakan untuk mengidentifikasi
+        kombinasi produk yang berpotensi menjadi kandidat
+        paket penjualan PT CKL.
         """
+    )
+
+
+# =========================================================
+# 11. HALAMAN KANDIDAT PAKET PENJUALAN
+# =========================================================
+
+elif menu == "Kandidat Paket Penjualan":
+
+    st.title("📦 Kandidat Paket Penjualan")
+
+    st.write(
+        "Berikut merupakan lima kombinasi produk yang "
+        "diperoleh dari hasil pengolahan aturan asosiasi Apriori."
     )
 
     st.info(
-        """
-        Hasil pengujian kedua menghasilkan 20 aturan asosiasi.
-        Rata-rata support sebesar 0,012129, rata-rata confidence
-        sebesar 0,855423, dan rata-rata lift sebesar 64,262390.
-        """
-    )
-
-    st.caption(
-        "Catatan: halaman ini menampilkan ringkasan metrik hasil Colab. "
-        "Rincian 20 baris aturan asosiasi dapat ditambahkan setelah "
-        "tabel lengkap hasil Colab dimasukkan ke dalam kode."
-    )
-
-
-# =========================================================
-# 8. HALAMAN KANDIDAT PAKET PENJUALAN
-# =========================================================
-
-elif menu == "📦 Kandidat Paket Penjualan":
-
-    st.title("Kandidat Paket Penjualan")
-
-    st.write(
-        """
-        Lima kandidat paket penjualan berikut diperoleh
-        dari pengelompokan aturan asosiasi pada pengujian
-        kedua algoritma Apriori.
-        """
+        "Kandidat paket merupakan rekomendasi berdasarkan "
+        "pola transaksi historis, bukan paket yang sudah "
+        "diterapkan oleh perusahaan."
     )
 
     st.dataframe(
@@ -526,109 +786,65 @@ elif menu == "📦 Kandidat Paket Penjualan":
 
     st.divider()
 
-    st.subheader("Detail Kandidat Paket")
+    st.subheader("Visualisasi Jumlah Transaksi")
 
-    pilihan = st.selectbox(
-        "Pilih kandidat paket",
-        DATA_KANDIDAT["Kandidat"].tolist()
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    ax.barh(
+        DATA_KANDIDAT["Kandidat Paket"].iloc[::-1],
+        DATA_KANDIDAT["Jumlah Transaksi"].iloc[::-1]
     )
 
-    detail = DATA_KANDIDAT[
-        DATA_KANDIDAT["Kandidat"] == pilihan
-    ].iloc[0]
+    ax.set_xlabel("Jumlah Transaksi")
+    ax.set_ylabel("Kandidat Paket")
+    ax.set_title("Jumlah Transaksi pada Setiap Kandidat Paket")
 
-    st.markdown(f"### {detail['Kandidat']}")
+    plt.tight_layout()
+
+    st.pyplot(fig)
+    plt.close(fig)
+
+    st.divider()
+
+    st.subheader("Kesimpulan Kandidat")
 
     st.write(
-        f"**Kombinasi Produk:** {detail['Kombinasi Produk']}"
-    )
+        """
+        - Kandidat 1 memiliki nilai confidence dan lift tertinggi.
+        - Kandidat 2 muncul pada jumlah pelanggan terbanyak.
+        - Kandidat 3 memiliki support dan jumlah transaksi tertinggi.
 
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Support",
-        format_persen(detail["Support"])
-    )
-
-    col2.metric(
-        "Confidence",
-        detail["Confidence"]
-    )
-
-    col3.metric(
-        "Lift",
-        format_desimal(detail["Lift"])
-    )
-
-    col1, col2 = st.columns(2)
-
-    col1.metric(
-        "Jumlah Transaksi",
-        int(detail["Jumlah Transaksi"])
-    )
-
-    col2.metric(
-        "Jumlah Pelanggan",
-        int(detail["Jumlah Pelanggan"])
-    )
-
-    if detail["Jumlah Pelanggan"] == 1:
-        st.warning(
-            "Kombinasi ini ditemukan pada satu pelanggan. "
-            "Pertimbangkan kebutuhan pelanggan tersebut "
-            "sebelum menjadikannya penawaran umum."
-        )
-    else:
-        st.success(
-            "Kombinasi ini ditemukan pada lebih dari satu pelanggan."
-        )
-
-    st.caption(
-        "Kandidat paket merupakan rekomendasi berdasarkan pola "
-        "transaksi historis, bukan paket yang sudah diterapkan."
+        Dengan demikian, pemilihan kandidat paket tidak hanya
+        mempertimbangkan satu nilai metrik, tetapi juga
+        frekuensi kemunculan dan sebaran pelanggan.
+        """
     )
 
 
 # =========================================================
-# 9. HALAMAN PENGUJIAN PARAMETER
+# 12. HALAMAN PENGUJIAN PARAMETER
 # =========================================================
 
-elif menu == "⚙️ Pengujian Parameter":
+elif menu == "Pengujian Parameter":
 
-    st.title("Hasil Pengujian Parameter Apriori")
+    st.title("⚙️ Pengujian Parameter Algoritma Apriori")
 
     st.write(
-        """
-        Pengujian dilakukan menggunakan lima konfigurasi
-        minimum support dan minimum confidence.
-        """
-    )
-
-    tabel_pengujian = DATA_PENGUJIAN.copy()
-
-    tabel_pengujian["Minimum Support"] = (
-        tabel_pengujian["Minimum Support"].map(
-            lambda x: f"{x:.3f}".replace(".", ",")
-        )
-    )
-
-    tabel_pengujian["Minimum Confidence"] = (
-        tabel_pengujian["Minimum Confidence"].map(
-            lambda x: f"{x:.2f}".replace(".", ",")
-        )
+        "Halaman ini menampilkan perbandingan lima konfigurasi "
+        "minimum support dan minimum confidence."
     )
 
     st.dataframe(
-        tabel_pengujian,
+        DATA_PENGUJIAN,
         use_container_width=True,
         hide_index=True
     )
 
     st.divider()
 
-    st.subheader("Perbandingan Frequent Itemsets")
+    st.subheader("Grafik Jumlah Frequent Itemsets")
 
-    fig, ax = plt.subplots(figsize=(9, 4))
+    fig, ax = plt.subplots(figsize=(10, 4))
 
     ax.bar(
         DATA_PENGUJIAN["Pengujian"],
@@ -637,19 +853,16 @@ elif menu == "⚙️ Pengujian Parameter":
 
     ax.set_xlabel("Konfigurasi Pengujian")
     ax.set_ylabel("Jumlah Frequent Itemsets")
-    ax.set_title("Jumlah Frequent Itemsets pada Lima Pengujian")
+    ax.set_title("Perbandingan Frequent Itemsets")
 
-    plt.xticks(rotation=20)
     plt.tight_layout()
 
     st.pyplot(fig)
     plt.close(fig)
 
-    st.divider()
+    st.subheader("Grafik Jumlah Aturan Asosiasi")
 
-    st.subheader("Perbandingan Aturan Asosiasi")
-
-    fig, ax = plt.subplots(figsize=(9, 4))
+    fig, ax = plt.subplots(figsize=(10, 4))
 
     ax.bar(
         DATA_PENGUJIAN["Pengujian"],
@@ -658,9 +871,8 @@ elif menu == "⚙️ Pengujian Parameter":
 
     ax.set_xlabel("Konfigurasi Pengujian")
     ax.set_ylabel("Jumlah Aturan Asosiasi")
-    ax.set_title("Jumlah Aturan Asosiasi pada Lima Pengujian")
+    ax.set_title("Perbandingan Aturan Asosiasi")
 
-    plt.xticks(rotation=20)
     plt.tight_layout()
 
     st.pyplot(fig)
@@ -672,132 +884,27 @@ elif menu == "⚙️ Pengujian Parameter":
 
     st.success(
         """
-        Pengujian kedua dipilih menggunakan minimum support
-        0,010 dan minimum confidence 0,20. Konfigurasi ini
-        menghasilkan 45 frequent itemsets dan 20 aturan asosiasi.
-        """
-    )
+        Pengujian kedua dipilih dengan minimum support 0,010
+        dan minimum confidence 0,20.
 
-    st.caption(
-        "Minimum support dan minimum confidence dinaikkan "
-        "secara bersamaan. Oleh karena itu, hasil pengujian "
-        "menggambarkan perubahan gabungan kedua parameter."
-    )
-
-
-# =========================================================
-# 10. HALAMAN GRAFIK DAN ANALISIS
-# =========================================================
-
-elif menu == "📊 Grafik dan Analisis":
-
-    st.title("Grafik dan Analisis Hasil Penelitian")
-
-    st.write(
-        """
-        Halaman ini menyajikan visualisasi hasil penelitian
-        berdasarkan lima kandidat paket penjualan dan
-        hasil pengujian algoritma Apriori.
-        """
-    )
-
-    st.divider()
-
-    st.subheader("Jumlah Transaksi pada Setiap Kandidat")
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    ax.barh(
-        DATA_KANDIDAT["Kandidat"],
-        DATA_KANDIDAT["Jumlah Transaksi"]
-    )
-
-    ax.set_xlabel("Jumlah Transaksi")
-    ax.set_ylabel("Kandidat Paket")
-    ax.set_title("Jumlah Transaksi per Kandidat Paket")
-
-    plt.tight_layout()
-
-    st.pyplot(fig)
-    plt.close(fig)
-
-    st.divider()
-
-    st.subheader("Jumlah Pelanggan pada Setiap Kandidat")
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    ax.bar(
-        DATA_KANDIDAT["Kandidat"],
-        DATA_KANDIDAT["Jumlah Pelanggan"]
-    )
-
-    ax.set_xlabel("Kandidat Paket")
-    ax.set_ylabel("Jumlah Pelanggan")
-    ax.set_title("Persebaran Pelanggan pada Kandidat Paket")
-
-    plt.tight_layout()
-
-    st.pyplot(fig)
-    plt.close(fig)
-
-    st.divider()
-
-    st.subheader("Perbandingan Nilai Lift")
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    ax.barh(
-        DATA_KANDIDAT["Kandidat"],
-        DATA_KANDIDAT["Lift"]
-    )
-
-    ax.set_xlabel("Nilai Lift")
-    ax.set_ylabel("Kandidat Paket")
-    ax.set_title("Nilai Lift pada Lima Kandidat Paket")
-
-    plt.tight_layout()
-
-    st.pyplot(fig)
-    plt.close(fig)
-
-    st.divider()
-
-    st.subheader("Kesimpulan Visualisasi")
-
-    st.markdown(
-        """
-        - Kandidat 1 memiliki nilai confidence dan lift tertinggi.
-        - Kandidat 3 memiliki support dan jumlah transaksi tertinggi.
-        - Kandidat 2 memiliki jumlah pelanggan terbanyak.
-        - Seluruh kandidat memiliki nilai lift lebih dari 1.
-        """
-    )
-
-    st.info(
-        """
-        Hasil visualisasi menunjukkan bahwa setiap kandidat
-        memiliki keunggulan yang berbeda. Penentuan paket yang
-        akan diterapkan tetap perlu mempertimbangkan kebutuhan
-        pelanggan dan kondisi operasional perusahaan.
+        Konfigurasi ini menghasilkan 45 frequent itemsets
+        dan 20 aturan asosiasi. Konfigurasi tersebut dipilih
+        sebagai keseimbangan antara jumlah pola yang ditemukan
+        dan jumlah aturan asosiasi yang dihasilkan.
         """
     )
 
 
 # =========================================================
-# 11. FOOTER
+# 13. FOOTER
 # =========================================================
 
 st.sidebar.divider()
 
 st.sidebar.caption(
-    "Dashboard Penelitian Skripsi"
+    "Dashboard Penjualan dan Market Basket Analysis"
 )
 
 st.sidebar.caption(
-    "PT Cakrawala Kemasindo Lestari"
-)
-
-st.sidebar.caption(
-    "Hasil Analisis Data Penjualan Tahun 2025"
+    "PT Cakrawala Kemasindo Lestari | 2025"
 )
