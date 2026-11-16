@@ -215,22 +215,19 @@ st.sidebar.title("📊 Dashboard PT CKL")
 menu = st.sidebar.radio(
     "Menu Navigasi",
     [
-        "🏠 Beranda & Ringkasan",
+        "🏠 Beranda",
         "📈 Analisis & Karakteristik Data",
         "🔍 Hasil & Kandidat Apriori"
     ]
 )
 
-st.sidebar.divider()
-st.sidebar.caption("Sistem Informasi | Data Science")
-st.sidebar.caption("PT Cakrawala Kemasindo Lestari")
 
 
 # =========================================================
 # 7. MENU 1: BERANDA & RINGKASAN EKSEKUTIF
 # =========================================================
 
-if menu == "🏠 Beranda & Ringkasan":
+if menu == "🏠 Beranda":
 
     st.title("📊 Dashboard Penjualan PT CKL")
     st.write(
