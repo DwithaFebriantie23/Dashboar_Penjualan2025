@@ -208,7 +208,7 @@ DATA_KANDIDAT = pd.DataFrame({
 
 
 # =========================================================
-# 6. NAVIGASI SIDEBAR (Diringkas jadi 3 Menu Utama)
+# 6. NAVIGASI SIDEBAR
 # =========================================================
 
 st.sidebar.title("📊 Dashboard PT CKL")
@@ -247,11 +247,14 @@ if menu == "🏠 Beranda & Ringkasan":
     total_pelanggan = df["CUSTOMER"].nunique()
     total_produk = df["ITEM"].nunique()
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Penjualan", rupiah(total_penjualan))
-    col2.metric("Jumlah Transaksi", angka(total_transaksi))
-    col3.metric("Jumlah Pelanggan", angka(total_pelanggan))
-    col4.metric("Jenis Produk", angka(total_produk))
+    # METRIK DIBUAT 2 BARIS (2 KOLOM PER BARIS) AGAR LEBIH LUAS
+    row1_c1, row1_c2 = st.columns(2)
+    row1_c1.metric("Total Penjualan", rupiah(total_penjualan))
+    row1_c2.metric("Jumlah Transaksi", angka(total_transaksi))
+
+    row2_c1, row2_c2 = st.columns(2)
+    row2_c1.metric("Jumlah Pelanggan", angka(total_pelanggan))
+    row2_c2.metric("Jenis Produk", angka(total_produk))
 
     st.divider()
 
@@ -337,12 +340,14 @@ elif menu == "📈 Analisis & Karakteristik Data":
 
     st.divider()
 
-    # Ringkasan Metrik Filter
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Penjualan", rupiah(data_filter["TOTAL"].sum()))
-    col2.metric("Jumlah Transaksi", angka(data_filter["ID TRANSAKSI"].nunique()))
-    col3.metric("Jumlah Pelanggan", angka(data_filter["CUSTOMER"].nunique()))
-    col4.metric("Total QTY", angka(data_filter["QTY"].sum()))
+    # METRIK FILTER DIBUAT 2 BARIS (2 KOLOM PER BARIS)
+    f_row1_c1, f_row1_c2 = st.columns(2)
+    f_row1_c1.metric("Total Penjualan", rupiah(data_filter["TOTAL"].sum()))
+    f_row1_c2.metric("Jumlah Transaksi", angka(data_filter["ID TRANSAKSI"].nunique()))
+
+    f_row2_c1, f_row2_c2 = st.columns(2)
+    f_row2_c1.metric("Jumlah Pelanggan", angka(data_filter["CUSTOMER"].nunique()))
+    f_row2_c2.metric("Total QTY", angka(data_filter["QTY"].sum()))
 
     st.divider()
 
