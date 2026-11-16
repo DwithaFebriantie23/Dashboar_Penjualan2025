@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -1115,4 +1114,3 @@ st.sidebar.caption(
 st.sidebar.caption(
     "PT Cakrawala Kemasindo Lestari | 2025"
 )
-
