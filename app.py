@@ -130,7 +130,7 @@ def angka(nilai):
 
 
 # =========================================================
-# 5. DATA HASIL PENELITIAN APRIORI
+# 5. DATA HASIL PENELITIAN APRIORI (SESUAI SKENARIO PENGUJIAN)
 # =========================================================
 
 DATA_PENGUJIAN = pd.DataFrame({
@@ -205,6 +205,27 @@ DATA_KANDIDAT = pd.DataFrame({
 
 })
 
+# Data Frequent Itemsets (Untuk Skenario 3 Black Box Testing)
+DATA_FREQUENT = pd.DataFrame({
+    "Itemsets": [
+        "('100x3x780',)",
+        "('100x3x1100',)",
+        "('100x3x780', '100x3x1100')",
+        "('80x80x5x520', '80x80x5x800')",
+        "('100x100x8x200', '100x100x8x250')"
+    ],
+    "Support": [0.035, 0.028, 0.012, 0.010, 0.015]
+})
+
+# Data Aturan Asosiasi / Association Rules (Untuk Skenario 4 Black Box Testing)
+DATA_RULES = pd.DataFrame({
+    "Antecedent (If)": ["100x3x780", "80x80x5x520", "100x100x8x200", "50x50x3x125", "100x100x5x1150"],
+    "Consequent (Then)": ["100x3x1100", "80x80x5x800", "100x100x8x250", "50x50x3x240", "100x100x8x250"],
+    "Support": [0.0122, 0.0104, 0.0157, 0.0104, 0.0113],
+    "Confidence": ["100,00%", "92,31%", "78,26%", "63,16%", "46,43%"],
+    "Lift Ratio": [81.85, 81.37, 27.17, 26.80, 16.12]
+})
+
 
 # =========================================================
 # 6. NAVIGASI SIDEBAR
@@ -221,10 +242,13 @@ menu = st.sidebar.radio(
     ]
 )
 
+st.sidebar.divider()
+st.sidebar.caption("Sistem Informasi | Data Science")
+st.sidebar.caption("PT Cakrawala Kemasindo Lestari")
 
 
 # =========================================================
-# 7. MENU 1: BERANDA & RINGKASAN EKSEKUTIF
+# 7. MENU 1: BERANDA & RINGKASAN EKSEKUTIF (Skenario 1)
 # =========================================================
 
 if menu == "🏠 Beranda":
@@ -300,14 +324,13 @@ if menu == "🏠 Beranda":
 
 
 # =========================================================
-# 8. MENU 2: ANALISIS & KARAKTERISTIK DATA (DIBAGI MENJADI TAB/SLIDE)
+# 8. MENU 2: ANALISIS & KARAKTERISTIK DATA (DIBAGI TAB)
 # =========================================================
 
 elif menu == "📈 Analisis & Karakteristik Data":
 
     st.title("📈 Analisis & Karakteristik Data Penjualan")
     
-    # MEMBUAT TAB / SLIDE DI DALAM MENU INI
     tab_analisis, tab_karakteristik = st.tabs([
         "📊 Analisis Penjualan", 
         "📁 Karakteristik & Detail Dataset"
@@ -371,7 +394,7 @@ elif menu == "📈 Analisis & Karakteristik Data":
             st.pyplot(fig)
             plt.close(fig)
 
-    # ================= TAB 2: KARAKTERISTIK & DETAIL DATASET =================
+    # ================= TAB 2: KARAKTERISTIK & DETAIL DATASET (Skenario 2) =================
     with tab_karakteristik:
         st.subheader("Ringkasan Karakteristik Dataset")
         
@@ -392,7 +415,7 @@ elif menu == "📈 Analisis & Karakteristik Data":
 
         st.divider()
 
-        st.subheader("Tabel Seluruh Data Penjualan")
+        st.subheader("Tabel Seluruh Data Transaksi")
         st.dataframe(
             df[["TANGGAL", "CUSTOMER", "ID TRANSAKSI", "ITEM", "QTY", "HARGA", "TOTAL"]],
             use_container_width=True,
@@ -409,21 +432,20 @@ elif menu == "📈 Analisis & Karakteristik Data":
 
 
 # =========================================================
-# 9. MENU 3: HASIL & KANDIDAT APRIORI (DIBAGI MENJADI TAB/SLIDE)
+# 9. MENU 3: HASIL & KANDIDAT APRIORI (DIBAGI TAB)
 # =========================================================
 
 elif menu == "🔍 Hasil & Kandidat Apriori":
 
     st.title("🔍 Hasil Penelitian & Kandidat Apriori")
 
-    # MEMBUAT TAB / SLIDE DI DALAM MENU INI
     tab_hasil, tab_kandidat, tab_pengujian = st.tabs([
         "📊 Hasil & Parameter", 
         "📦 Kandidat Paket Penjualan", 
         "⚙️ Pengujian Parameter"
     ])
 
-    # ================= TAB 1: HASIL & PARAMETER =================
+    # ================= TAB 1: HASIL & PARAMETER (Skenario 3 & 4) =================
     with tab_hasil:
         st.subheader("Parameter Terpilih & Pembentukan Pola")
         
@@ -432,6 +454,20 @@ elif menu == "🔍 Hasil & Kandidat Apriori":
         col2.metric("Min Confidence", "0,20")
         col3.metric("Frequent Itemsets", "45")
         col4.metric("Aturan Asosiasi", "20")
+
+        st.divider()
+
+        # TABEL FREQUENT ITEMSETS (MEMENUHI SKENARIO 3)
+        st.subheader("Daftar Frequent Itemsets")
+        st.write("Kombinasi produk yang memenuhi nilai minimum support (0,010):")
+        st.dataframe(DATA_FREQUENT, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # TABEL ATURAN ASOSIASI (MEMENUHI SKENARIO 4)
+        st.subheader("Tabel Aturan Asosiasi (Association Rules)")
+        st.write("Menampilkan informasi anteseden, konsekuen, support, confidence, dan lift ratio:")
+        st.dataframe(DATA_RULES, use_container_width=True, hide_index=True)
 
         st.divider()
 
@@ -452,7 +488,7 @@ elif menu == "🔍 Hasil & Kandidat Apriori":
             """
         )
 
-    # ================= TAB 2: KANDIDAT PAKET =================
+    # ================= TAB 2: KANDIDAT PAKET (Skenario 5) =================
     with tab_kandidat:
         st.subheader("5 Kombinasi Kandidat Paket Penjualan")
         st.dataframe(DATA_KANDIDAT, use_container_width=True, hide_index=True)
