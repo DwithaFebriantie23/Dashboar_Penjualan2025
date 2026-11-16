@@ -130,7 +130,7 @@ def angka(nilai):
 
 
 # =========================================================
-# 5. DATA HASIL PENELITIAN APRIORI (SESUAI SKENARIO PENGUJIAN)
+# 5. DATA HASIL PENELITIAN APRIORI
 # =========================================================
 
 DATA_PENGUJIAN = pd.DataFrame({
@@ -205,7 +205,6 @@ DATA_KANDIDAT = pd.DataFrame({
 
 })
 
-# Data Frequent Itemsets (Untuk Skenario 3 Black Box Testing)
 DATA_FREQUENT = pd.DataFrame({
     "Itemsets": [
         "('100x3x780',)",
@@ -217,7 +216,6 @@ DATA_FREQUENT = pd.DataFrame({
     "Support": [0.035, 0.028, 0.012, 0.010, 0.015]
 })
 
-# Data Aturan Asosiasi / Association Rules (Untuk Skenario 4 Black Box Testing)
 DATA_RULES = pd.DataFrame({
     "Antecedent (If)": ["100x3x780", "80x80x5x520", "100x100x8x200", "50x50x3x125", "100x100x5x1150"],
     "Consequent (Then)": ["100x3x1100", "80x80x5x800", "100x100x8x250", "50x50x3x240", "100x100x8x250"],
@@ -237,8 +235,8 @@ menu = st.sidebar.radio(
     "Menu Navigasi",
     [
         "🏠 Beranda",
-        "📈 Analisis & Karakteristik Data",
-        "🔍 Hasil & Kandidat Apriori"
+        "📈 Analisis Penjualan",
+        "🔍 Hasil Apriori"
     ]
 )
 
@@ -248,7 +246,7 @@ st.sidebar.caption("PT Cakrawala Kemasindo Lestari")
 
 
 # =========================================================
-# 7. MENU 1: BERANDA & RINGKASAN EKSEKUTIF (Skenario 1)
+# 7. MENU 1: BERANDA
 # =========================================================
 
 if menu == "🏠 Beranda":
@@ -267,7 +265,7 @@ if menu == "🏠 Beranda":
     total_pelanggan = df["CUSTOMER"].nunique()
     total_produk = df["ITEM"].nunique()
 
-    # METRIK 2 BARIS (2 KOLOM PER BARIS)
+    # METRIK 2 BARIS
     row1_c1, row1_c2 = st.columns(2)
     row1_c1.metric("Total Penjualan", rupiah(total_penjualan))
     row1_c2.metric("Jumlah Transaksi", angka(total_transaksi))
@@ -324,19 +322,19 @@ if menu == "🏠 Beranda":
 
 
 # =========================================================
-# 8. MENU 2: ANALISIS & KARAKTERISTIK DATA (DIBAGI TAB)
+# 8. MENU 2: ANALISIS PENJUALAN (DENGAN TAB)
 # =========================================================
 
-elif menu == "📈 Analisis & Karakteristik Data":
+elif menu == "📈 Analisis Penjualan":
 
-    st.title("📈 Analisis & Karakteristik Data Penjualan")
+    st.title("📈 Analisis Penjualan")
     
     tab_analisis, tab_karakteristik = st.tabs([
-        "📊 Analisis Penjualan", 
-        "📁 Karakteristik & Detail Dataset"
+        "📊 Statistik Penjualan", 
+        "📁 Karakteristik Dataset"
     ])
 
-    # ================= TAB 1: ANALISIS PENJUALAN =================
+    # ================= TAB 1: STATISTIK PENJUALAN =================
     with tab_analisis:
         st.subheader("Filter Data Interaktif")
         
@@ -352,20 +350,26 @@ elif menu == "📈 Analisis & Karakteristik Data":
         with col3:
             pilihan_item = st.multiselect("Pilih UK Produk", options=daftar_item, key="f_item")
 
+        # LOGIKA FILTER FLEKSIBEL
         data_filter = df.copy()
+
         if pilihan_bulan:
-            data_filter = data_filter[data_filter["BULAN"].astype(str).isin(pilihan_bulan)]
-        else:
-            data_filter = data_filter.iloc[0:0]
+            data_filter = data_filter[
+                data_filter["BULAN"].astype(str).isin(pilihan_bulan)
+            ]
 
         if pilihan_customer:
-            data_filter = data_filter[data_filter["CUSTOMER"].isin(pilihan_customer)]
+            data_filter = data_filter[
+                data_filter["CUSTOMER"].isin(pilihan_customer)
+            ]
+
         if pilihan_item:
-            data_filter = data_filter[data_filter["ITEM"].isin(pilihan_item)]
+            data_filter = data_filter[
+                data_filter["ITEM"].isin(pilihan_item)
+            ]
 
         st.divider()
 
-        # METRIK FILTER 2 BARIS
         f_row1_c1, f_row1_c2 = st.columns(2)
         f_row1_c1.metric("Total Penjualan", rupiah(data_filter["TOTAL"].sum()))
         f_row1_c2.metric("Jumlah Transaksi", angka(data_filter["ID TRANSAKSI"].nunique()))
@@ -393,8 +397,10 @@ elif menu == "📈 Analisis & Karakteristik Data":
             plt.tight_layout()
             st.pyplot(fig)
             plt.close(fig)
+        else:
+            st.warning("Tidak terdapat data produk sesuai kombinasi filter yang dipilih.")
 
-    # ================= TAB 2: KARAKTERISTIK & DETAIL DATASET (Skenario 2) =================
+    # ================= TAB 2: KARAKTERISTIK DATASET =================
     with tab_karakteristik:
         st.subheader("Ringkasan Karakteristik Dataset")
         
@@ -432,20 +438,20 @@ elif menu == "📈 Analisis & Karakteristik Data":
 
 
 # =========================================================
-# 9. MENU 3: HASIL & KANDIDAT APRIORI (DIBAGI TAB)
+# 9. MENU 3: HASIL APRIORI (DENGAN TAB)
 # =========================================================
 
-elif menu == "🔍 Hasil & Kandidat Apriori":
+elif menu == "🔍 Hasil Apriori":
 
-    st.title("🔍 Hasil Penelitian & Kandidat Apriori")
+    st.title("🔍 Hasil Penelitian Apriori")
 
     tab_hasil, tab_kandidat, tab_pengujian = st.tabs([
-        "📊 Hasil & Parameter", 
-        "📦 Kandidat Paket Penjualan", 
-        "⚙️ Pengujian Parameter"
+        "📊 Parameter & Pola", 
+        "📦 Kandidat Paket", 
+        "⚙️ Evaluasi Pengujian"
     ])
 
-    # ================= TAB 1: HASIL & PARAMETER (Skenario 3 & 4) =================
+    # ================= TAB 1: PARAMETER & POLA =================
     with tab_hasil:
         st.subheader("Parameter Terpilih & Pembentukan Pola")
         
@@ -457,14 +463,12 @@ elif menu == "🔍 Hasil & Kandidat Apriori":
 
         st.divider()
 
-        # TABEL FREQUENT ITEMSETS (MEMENUHI SKENARIO 3)
         st.subheader("Daftar Frequent Itemsets")
         st.write("Kombinasi produk yang memenuhi nilai minimum support (0,010):")
         st.dataframe(DATA_FREQUENT, use_container_width=True, hide_index=True)
 
         st.divider()
 
-        # TABEL ATURAN ASOSIASI (MEMENUHI SKENARIO 4)
         st.subheader("Tabel Aturan Asosiasi (Association Rules)")
         st.write("Menampilkan informasi anteseden, konsekuen, support, confidence, dan lift ratio:")
         st.dataframe(DATA_RULES, use_container_width=True, hide_index=True)
@@ -488,7 +492,7 @@ elif menu == "🔍 Hasil & Kandidat Apriori":
             """
         )
 
-    # ================= TAB 2: KANDIDAT PAKET (Skenario 5) =================
+    # ================= TAB 2: KANDIDAT PAKET =================
     with tab_kandidat:
         st.subheader("5 Kombinasi Kandidat Paket Penjualan")
         st.dataframe(DATA_KANDIDAT, use_container_width=True, hide_index=True)
@@ -508,7 +512,7 @@ elif menu == "🔍 Hasil & Kandidat Apriori":
         st.pyplot(fig)
         plt.close(fig)
 
-    # ================= TAB 3: PENGUJIAN PARAMETER =================
+    # ================= TAB 3: EVALUASI PENGUJIAN =================
     with tab_pengujian:
         st.subheader("Perbandingan Pengujian Parameter")
         st.dataframe(DATA_PENGUJIAN, use_container_width=True, hide_index=True)
