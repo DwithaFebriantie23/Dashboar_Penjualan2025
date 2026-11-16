@@ -331,37 +331,38 @@ if menu == "Beranda":
 
         st.pyplot(fig)
         plt.close(fig)
+
     st.subheader("Kontribusi Penjualan per Bulan Tahun 2025")
 
-data_tahunan = df[df["TANGGAL"].dt.year == 2025].copy()
+    data_tahunan = df[df["TANGGAL"].dt.year == 2025].copy()
 
-penjualan_bulanan = (
-    data_tahunan.groupby(data_tahunan["TANGGAL"].dt.month)["TOTAL"]
-    .sum()
-    .reindex(range(1, 13), fill_value=0)
-)
-
-nama_bulan = [
-    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
-    "Jul", "Agu", "Sep", "Okt", "Nov", "Des"
-]
-
-fig, ax = plt.subplots(figsize=(9, 6))
-
-data_pie = penjualan_bulanan[penjualan_bulanan > 0]
-
-if not data_pie.empty:
-    ax.pie(
-        data_pie.values,
-        labels=[nama_bulan[i - 1] for i in data_pie.index],
-        autopct="%1.1f%%",
-        startangle=90
+    penjualan_bulanan = (
+        data_tahunan.groupby(data_tahunan["TANGGAL"].dt.month)["TOTAL"]
+        .sum()
+        .reindex(range(1, 13), fill_value=0)
     )
-    ax.set_title("Persentase Penjualan per Bulan Tahun 2025")
-    ax.axis("equal")
-    st.pyplot(fig)
-else:
-    st.write("Belum terdapat data penjualan tahun 2025.")
+
+    nama_bulan = [
+        "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+        "Jul", "Agu", "Sep", "Okt", "Nov", "Des"
+    ]
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+
+    data_pie = penjualan_bulanan[penjualan_bulanan > 0]
+
+    if not data_pie.empty:
+        ax.pie(
+            data_pie.values,
+            labels=[nama_bulan[i - 1] for i in data_pie.index],
+            autopct="%1.1f%%",
+            startangle=90
+        )
+        ax.set_title("Persentase Penjualan per Bulan Tahun 2025")
+        ax.axis("equal")
+        st.pyplot(fig)
+    else:
+        st.write("Belum terdapat data penjualan tahun 2025.")
 
 
 # =========================================================
@@ -452,10 +453,6 @@ elif menu == "Analisis Penjualan":
         "nama pelanggan, dan UK produk."
     )
 
-    # -----------------------------------------------------
-    # FILTER DATA
-    # -----------------------------------------------------
-
     col1, col2, col3 = st.columns(3)
 
     daftar_bulan = sorted(
@@ -492,10 +489,6 @@ elif menu == "Analisis Penjualan":
             options=daftar_item
         )
 
-    # -----------------------------------------------------
-    # FILTERING DATA
-    # -----------------------------------------------------
-
     data_filter = df.copy()
 
     if pilihan_bulan:
@@ -527,10 +520,6 @@ elif menu == "Analisis Penjualan":
         ]
 
     st.divider()
-
-    # -----------------------------------------------------
-    # EMPAT RINGKASAN PENJUALAN
-    # -----------------------------------------------------
 
     total_penjualan = data_filter["TOTAL"].sum()
 
@@ -567,10 +556,6 @@ elif menu == "Analisis Penjualan":
     )
 
     st.divider()
-
-    # -----------------------------------------------------
-    # GRAFIK PENJUALAN PER BULAN
-    # -----------------------------------------------------
 
     st.subheader("Total Penjualan per Bulan")
 
@@ -624,8 +609,6 @@ elif menu == "Analisis Penjualan":
         st.pyplot(fig)
         plt.close(fig)
 
-        # Tabel nominal penjualan lengkap
-
         tabel_bulanan = penjualan_bulanan.copy()
 
         tabel_bulanan["TOTAL PENJUALAN"] = (
@@ -648,10 +631,6 @@ elif menu == "Analisis Penjualan":
 
     st.divider()
 
-    # -----------------------------------------------------
-    # GRAFIK PENJUALAN BERDASARKAN PELANGGAN
-    # -----------------------------------------------------
-
     st.subheader("Total Penjualan Berdasarkan Pelanggan")
 
     penjualan_customer = (
@@ -673,8 +652,6 @@ elif menu == "Analisis Penjualan":
         ax.set_xlabel("Total Penjualan (Rupiah)")
         ax.set_ylabel("Nama Pelanggan")
         ax.set_title("Penjualan Berdasarkan Pelanggan")
-
-        # Menampilkan nominal lengkap pada grafik
 
         for bar in bars:
 
@@ -699,8 +676,6 @@ elif menu == "Analisis Penjualan":
         st.pyplot(fig)
         plt.close(fig)
 
-        # Tabel pelanggan
-
         tabel_customer = penjualan_customer.copy()
 
         tabel_customer["TOTAL PENJUALAN"] = (
@@ -722,10 +697,6 @@ elif menu == "Analisis Penjualan":
         )
 
     st.divider()
-
-    # -----------------------------------------------------
-    # PRODUK DENGAN QTY TERTINGGI
-    # -----------------------------------------------------
 
     st.subheader("10 Produk dengan Total QTY Tertinggi")
 
@@ -767,10 +738,6 @@ elif menu == "Analisis Penjualan":
 
     st.divider()
 
-    # -----------------------------------------------------
-    # DETAIL DATA PENJUALAN
-    # -----------------------------------------------------
-
     st.subheader("Detail Data Berdasarkan Filter")
 
     st.write(
@@ -792,8 +759,6 @@ elif menu == "Analisis Penjualan":
         use_container_width=True,
         hide_index=True
     )
-
-    # Mengunduh hasil filter
 
     csv = data_filter.to_csv(
         index=False
