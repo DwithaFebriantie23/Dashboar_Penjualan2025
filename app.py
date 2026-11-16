@@ -97,7 +97,7 @@ try:
 except FileNotFoundError:
 
     st.error(
-        "File Penjualan2025(4).xlsx tidak ditemukan. "
+        "File Penjualan2025.xlsx tidak ditemukan. "
         "Pastikan file Excel berada satu folder dengan app.py."
     )
 
@@ -211,7 +211,7 @@ DATA_KANDIDAT = pd.DataFrame({
 # 6. NAVIGASI SIDEBAR
 # =========================================================
 
-st.sidebar.title("📊 Dashboard PT CKL")
+st.sidebar.title("📊 Dashboard PT. Cakrawala Kemasindo Lestari")
 
 menu = st.sidebar.radio(
     "Pilih Halaman",
@@ -331,6 +331,37 @@ if menu == "Beranda":
 
         st.pyplot(fig)
         plt.close(fig)
+    st.subheader("Kontribusi Penjualan per Bulan Tahun 2025")
+
+data_tahunan = df[df["TANGGAL"].dt.year == 2025].copy()
+
+penjualan_bulanan = (
+    data_tahunan.groupby(data_tahunan["TANGGAL"].dt.month)["TOTAL"]
+    .sum()
+    .reindex(range(1, 13), fill_value=0)
+)
+
+nama_bulan = [
+    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des"
+]
+
+fig, ax = plt.subplots(figsize=(9, 6))
+
+data_pie = penjualan_bulanan[penjualan_bulanan > 0]
+
+if not data_pie.empty:
+    ax.pie(
+        data_pie.values,
+        labels=[nama_bulan[i - 1] for i in data_pie.index],
+        autopct="%1.1f%%",
+        startangle=90
+    )
+    ax.set_title("Persentase Penjualan per Bulan Tahun 2025")
+    ax.axis("equal")
+    st.pyplot(fig)
+else:
+    st.write("Belum terdapat data penjualan tahun 2025.")
 
 
 # =========================================================
@@ -733,117 +764,6 @@ elif menu == "Analisis Penjualan":
     else:
 
         st.warning("Data produk tidak tersedia.")
-
-    st.divider()
-
-    # -----------------------------------------------------
-    # DIAGRAM PIE PENJUALAN TAHUNAN 2025
-    # -----------------------------------------------------
-
-    st.subheader(
-        "Diagram Pie Kontribusi Penjualan Bulanan Tahun 2025"
-    )
-
-    st.write(
-        "Diagram ini memperlihatkan persentase kontribusi "
-        "setiap bulan terhadap total penjualan tahunan PT CKL."
-    )
-
-    # Menggunakan seluruh data 2025,
-    # tidak terpengaruh filter pelanggan dan produk
-
-    data_tahunan = df[
-        df["TANGGAL"].dt.year == 2025
-    ].copy()
-
-    nama_bulan = [
-        "Januari",
-        "Februari",
-        "Maret",
-        "April",
-        "Mei",
-        "Juni",
-        "Juli",
-        "Agustus",
-        "September",
-        "Oktober",
-        "November",
-        "Desember"
-    ]
-
-    pie_bulanan = (
-        data_tahunan.groupby(
-            data_tahunan["TANGGAL"].dt.month
-        )["TOTAL"]
-        .sum()
-        .reindex(range(1, 13), fill_value=0)
-    )
-
-    pie_bulanan.index = nama_bulan
-
-    # Hanya menampilkan bulan yang memiliki penjualan
-
-    pie_bulanan = pie_bulanan[
-        pie_bulanan > 0
-    ]
-
-    if pie_bulanan.sum() > 0:
-
-        fig, ax = plt.subplots(figsize=(11, 8))
-
-        wedges, texts, autotexts = ax.pie(
-            pie_bulanan.values,
-            labels=pie_bulanan.index,
-            autopct="%1.1f%%",
-            startangle=90,
-            pctdistance=0.75,
-            textprops={"fontsize": 10}
-        )
-
-        ax.set_title(
-            "Persentase Kontribusi Penjualan Bulanan PT CKL Tahun 2025",
-            fontsize=13
-        )
-
-        ax.axis("equal")
-
-        st.pyplot(fig)
-        plt.close(fig)
-
-        # Tabel pendukung diagram pie
-
-        tabel_pie = pd.DataFrame({
-
-            "Bulan": pie_bulanan.index,
-
-            "Total Penjualan": [
-                rupiah(x)
-                for x in pie_bulanan.values
-            ],
-
-            "Persentase": [
-                f"{x / pie_bulanan.sum() * 100:.2f}%"
-                for x in pie_bulanan.values
-            ]
-
-        })
-
-        st.dataframe(
-            tabel_pie,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        st.caption(
-            "Diagram pie menggunakan seluruh data penjualan "
-            "tahun 2025, bukan data yang telah difilter."
-        )
-
-    else:
-
-        st.warning(
-            "Tidak terdapat data penjualan tahun 2025."
-        )
 
     st.divider()
 
