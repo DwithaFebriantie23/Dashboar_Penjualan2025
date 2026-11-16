@@ -161,7 +161,6 @@ DATA_PENGUJIAN = pd.DataFrame({
 
 })
 
-
 DATA_KANDIDAT = pd.DataFrame({
 
     "Kandidat Paket": [
@@ -247,7 +246,7 @@ if menu == "🏠 Beranda & Ringkasan":
     total_pelanggan = df["CUSTOMER"].nunique()
     total_produk = df["ITEM"].nunique()
 
-    # METRIK DIBUAT 2 BARIS (2 KOLOM PER BARIS) AGAR LEBIH LUAS
+    # METRIK 2 BARIS (2 KOLOM PER BARIS)
     row1_c1, row1_c2 = st.columns(2)
     row1_c1.metric("Total Penjualan", rupiah(total_penjualan))
     row1_c2.metric("Jumlah Transaksi", angka(total_transaksi))
@@ -304,146 +303,200 @@ if menu == "🏠 Beranda & Ringkasan":
 
 
 # =========================================================
-# 8. MENU 2: ANALISIS & KARAKTERISTIK DATA
+# 8. MENU 2: ANALISIS & KARAKTERISTIK DATA (DIBAGI MENJADI TAB/SLIDE)
 # =========================================================
 
 elif menu == "📈 Analisis & Karakteristik Data":
 
     st.title("📈 Analisis & Karakteristik Data Penjualan")
-    st.write("Eksplorasi data penjualan berdasarkan filter periode, pelanggan, dan produk.")
+    
+    # MEMBUAT TAB / SLIDE DI DALAM MENU INI
+    tab_analisis, tab_karakteristik = st.tabs([
+        "📊 Analisis Penjualan", 
+        "📁 Karakteristik & Detail Dataset"
+    ])
 
-    # -----------------------------------------------------
-    # FILTER DATA INTERAKTIF
-    # -----------------------------------------------------
-    col1, col2, col3 = st.columns(3)
-    daftar_bulan = sorted(df["BULAN"].dropna().astype(str).unique())
-    daftar_customer = sorted(df["CUSTOMER"].dropna().unique().tolist())
-    daftar_item = sorted(df["ITEM"].dropna().unique().tolist())
+    # ================= TAB 1: ANALISIS PENJUALAN =================
+    with tab_analisis:
+        st.subheader("Filter Data Interaktif")
+        
+        col1, col2, col3 = st.columns(3)
+        daftar_bulan = sorted(df["BULAN"].dropna().astype(str).unique())
+        daftar_customer = sorted(df["CUSTOMER"].dropna().unique().tolist())
+        daftar_item = sorted(df["ITEM"].dropna().unique().tolist())
 
-    with col1:
-        pilihan_bulan = st.multiselect("Pilih Bulan", options=daftar_bulan, default=daftar_bulan)
-    with col2:
-        pilihan_customer = st.multiselect("Pilih Pelanggan", options=daftar_customer)
-    with col3:
-        pilihan_item = st.multiselect("Pilih UK Produk", options=daftar_item)
+        with col1:
+            pilihan_bulan = st.multiselect("Pilih Bulan", options=daftar_bulan, default=daftar_bulan, key="f_bulan")
+        with col2:
+            pilihan_customer = st.multiselect("Pilih Pelanggan", options=daftar_customer, key="f_customer")
+        with col3:
+            pilihan_item = st.multiselect("Pilih UK Produk", options=daftar_item, key="f_item")
 
-    data_filter = df.copy()
-    if pilihan_bulan:
-        data_filter = data_filter[data_filter["BULAN"].astype(str).isin(pilihan_bulan)]
-    else:
-        data_filter = data_filter.iloc[0:0]
+        data_filter = df.copy()
+        if pilihan_bulan:
+            data_filter = data_filter[data_filter["BULAN"].astype(str).isin(pilihan_bulan)]
+        else:
+            data_filter = data_filter.iloc[0:0]
 
-    if pilihan_customer:
-        data_filter = data_filter[data_filter["CUSTOMER"].isin(pilihan_customer)]
-    if pilihan_item:
-        data_filter = data_filter[data_filter["ITEM"].isin(pilihan_item)]
+        if pilihan_customer:
+            data_filter = data_filter[data_filter["CUSTOMER"].isin(pilihan_customer)]
+        if pilihan_item:
+            data_filter = data_filter[data_filter["ITEM"].isin(pilihan_item)]
 
-    st.divider()
+        st.divider()
 
-    # METRIK FILTER DIBUAT 2 BARIS (2 KOLOM PER BARIS)
-    f_row1_c1, f_row1_c2 = st.columns(2)
-    f_row1_c1.metric("Total Penjualan", rupiah(data_filter["TOTAL"].sum()))
-    f_row1_c2.metric("Jumlah Transaksi", angka(data_filter["ID TRANSAKSI"].nunique()))
+        # METRIK FILTER 2 BARIS
+        f_row1_c1, f_row1_c2 = st.columns(2)
+        f_row1_c1.metric("Total Penjualan", rupiah(data_filter["TOTAL"].sum()))
+        f_row1_c2.metric("Jumlah Transaksi", angka(data_filter["ID TRANSAKSI"].nunique()))
 
-    f_row2_c1, f_row2_c2 = st.columns(2)
-    f_row2_c1.metric("Jumlah Pelanggan", angka(data_filter["CUSTOMER"].nunique()))
-    f_row2_c2.metric("Total QTY", angka(data_filter["QTY"].sum()))
+        f_row2_c1, f_row2_c2 = st.columns(2)
+        f_row2_c1.metric("Jumlah Pelanggan", angka(data_filter["CUSTOMER"].nunique()))
+        f_row2_c2.metric("Total QTY", angka(data_filter["QTY"].sum()))
 
-    st.divider()
+        st.divider()
 
-    # Produk Terlaris
-    st.subheader("10 Produk dengan QTY Tertinggi")
-    produk_terlaris = (
-        data_filter.groupby("ITEM")["QTY"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(10)
-        .reset_index()
-    )
+        st.subheader("10 Produk dengan QTY Tertinggi")
+        produk_terlaris = (
+            data_filter.groupby("ITEM")["QTY"]
+            .sum()
+            .sort_values(ascending=False)
+            .head(10)
+            .reset_index()
+        )
 
-    if not produk_terlaris.empty:
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.barh(produk_terlaris["ITEM"].iloc[::-1], produk_terlaris["QTY"].iloc[::-1])
-        ax.set_xlabel("Total QTY")
-        ax.set_ylabel("UK Produk")
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)
+        if not produk_terlaris.empty:
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.barh(produk_terlaris["ITEM"].iloc[::-1], produk_terlaris["QTY"].iloc[::-1])
+            ax.set_xlabel("Total QTY")
+            ax.set_ylabel("UK Produk")
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
 
-    st.divider()
+    # ================= TAB 2: KARAKTERISTIK & DETAIL DATASET =================
+    with tab_karakteristik:
+        st.subheader("Ringkasan Karakteristik Dataset")
+        
+        c_row1_c1, c_row1_c2, c_row1_c3 = st.columns(3)
+        c_row1_c1.metric("Jumlah Baris Data", angka(len(df)))
+        c_row1_c2.metric("Total Transaksi Unik", angka(df["ID TRANSAKSI"].nunique()))
+        c_row1_c3.metric("Total Jenis Produk", angka(df["ITEM"].nunique()))
 
-    # Tabel Karakteristik & Detail Data
-    st.subheader("Detail Data Penjualan Terfilter")
-    st.dataframe(
-        data_filter[["TANGGAL", "CUSTOMER", "ID TRANSAKSI", "ITEM", "QTY", "HARGA", "TOTAL"]],
-        use_container_width=True,
-        hide_index=True
-    )
+        st.divider()
 
-    csv = data_filter.to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
-        label="📥 Unduh Data Hasil Filter (CSV)",
-        data=csv,
-        file_name="data_penjualan_filter.csv",
-        mime="text/csv"
-    )
+        st.subheader("Informasi Kolom Dataset")
+        informasi = pd.DataFrame({
+            "Nama Kolom": df.columns,
+            "Jumlah Data Terisi": [df[kolom].notna().sum() for kolom in df.columns],
+            "Tipe Data": [str(df[kolom].dtype) for kolom in df.columns]
+        })
+        st.dataframe(informasi, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        st.subheader("Tabel Seluruh Data Penjualan")
+        st.dataframe(
+            df[["TANGGAL", "CUSTOMER", "ID TRANSAKSI", "ITEM", "QTY", "HARGA", "TOTAL"]],
+            use_container_width=True,
+            hide_index=True
+        )
+
+        csv = df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            label="📥 Unduh Seluruh Data Penjualan (CSV)",
+            data=csv,
+            file_name="data_penjualan_lengkap.csv",
+            mime="text/csv"
+        )
 
 
 # =========================================================
-# 9. MENU 3: HASIL & KANDIDAT APRIORI
+# 9. MENU 3: HASIL & KANDIDAT APRIORI (DIBAGI MENJADI TAB/SLIDE)
 # =========================================================
 
 elif menu == "🔍 Hasil & Kandidat Apriori":
 
-    st.title("🔍 Hasil Penelitian & Kandidat Paket Apriori")
-    st.write("Hasil pengolahan aturan asosiasi, kandidat paket penjualan, serta perbandingan parameter.")
+    st.title("🔍 Hasil Penelitian & Kandidat Apriori")
 
-    # 1. Ringkasan Hasil
-    st.subheader("Ringkasan Parameter & Pola Terpilih")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Min Support", "0,010")
-    col2.metric("Min Confidence", "0,20")
-    col3.metric("Frequent Itemsets", "45")
-    col4.metric("Aturan Asosiasi", "20")
+    # MEMBUAT TAB / SLIDE DI DALAM MENU INI
+    tab_hasil, tab_kandidat, tab_pengujian = st.tabs([
+        "📊 Hasil & Parameter", 
+        "📦 Kandidat Paket Penjualan", 
+        "⚙️ Pengujian Parameter"
+    ])
 
-    st.divider()
+    # ================= TAB 1: HASIL & PARAMETER =================
+    with tab_hasil:
+        st.subheader("Parameter Terpilih & Pembentukan Pola")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Min Support", "0,010")
+        col2.metric("Min Confidence", "0,20")
+        col3.metric("Frequent Itemsets", "45")
+        col4.metric("Aturan Asosiasi", "20")
 
-    # 2. Kandidat Paket
-    st.subheader("📦 Kandidat Paket Penjualan")
-    st.dataframe(DATA_KANDIDAT, use_container_width=True, hide_index=True)
+        st.divider()
 
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.barh(
-        DATA_KANDIDAT["Kandidat Paket"].iloc[::-1],
-        DATA_KANDIDAT["Jumlah Transaksi"].iloc[::-1]
-    )
-    ax.set_xlabel("Jumlah Transaksi")
-    ax.set_ylabel("Kandidat Paket")
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close(fig)
+        st.subheader("Rata-rata Nilai Aturan Asosiasi")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Average Support", "0,012129")
+        col2.metric("Average Confidence", "85,54%")
+        col3.metric("Average Lift", "64,262390")
 
-    st.divider()
+        st.divider()
 
-    # 3. Pengujian Parameter
-    st.subheader("⚙️ Perbandingan Pengujian Parameter")
-    st.dataframe(DATA_PENGUJIAN, use_container_width=True, hide_index=True)
+        st.subheader("Interpretasi Hasil")
+        st.write(
+            """
+            Berdasarkan konfigurasi parameter terpilih, algoritma Apriori menghasilkan 
+            45 frequent itemsets dan 20 aturan asosiasi. Nilai lift seluruh aturan lebih dari 1, 
+            menunjukkan adanya asosiasi positif yang kuat antar produk.
+            """
+        )
 
-    col1, col2 = st.columns(2)
-    with col1:
-        fig, ax = plt.subplots(figsize=(6, 3.5))
-        ax.bar(DATA_PENGUJIAN["Pengujian"], DATA_PENGUJIAN["Frequent Itemsets"], color="orange")
-        ax.set_title("Jumlah Frequent Itemsets")
-        plt.xticks(rotation=45)
+    # ================= TAB 2: KANDIDAT PAKET =================
+    with tab_kandidat:
+        st.subheader("5 Kombinasi Kandidat Paket Penjualan")
+        st.dataframe(DATA_KANDIDAT, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        st.subheader("Visualisasi Jumlah Transaksi per Kandidat")
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.barh(
+            DATA_KANDIDAT["Kandidat Paket"].iloc[::-1],
+            DATA_KANDIDAT["Jumlah Transaksi"].iloc[::-1],
+            color="#2ca02c"
+        )
+        ax.set_xlabel("Jumlah Transaksi")
+        ax.set_ylabel("Kandidat Paket")
         plt.tight_layout()
         st.pyplot(fig)
         plt.close(fig)
 
-    with col2:
-        fig, ax = plt.subplots(figsize=(6, 3.5))
-        ax.bar(DATA_PENGUJIAN["Pengujian"], DATA_PENGUJIAN["Aturan Asosiasi"], color="green")
-        ax.set_title("Jumlah Aturan Asosiasi")
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)
+    # ================= TAB 3: PENGUJIAN PARAMETER =================
+    with tab_pengujian:
+        st.subheader("Perbandingan Pengujian Parameter")
+        st.dataframe(DATA_PENGUJIAN, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Frequent Itemsets**")
+            fig, ax = plt.subplots(figsize=(5, 3.5))
+            ax.bar(DATA_PENGUJIAN["Pengujian"], DATA_PENGUJIAN["Frequent Itemsets"], color="orange")
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
+
+        with col2:
+            st.write("**Aturan Asosiasi**")
+            fig, ax = plt.subplots(figsize=(5, 3.5))
+            ax.bar(DATA_PENGUJIAN["Pengujian"], DATA_PENGUJIAN["Aturan Asosiasi"], color="purple")
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
